@@ -1,0 +1,2635 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI業務開發儀表板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html{ scroll-behavior:smooth; }
+  :root{
+    /* O'right 品牌色：把主色留給真正需要強調的地方，其餘都用中性色，維持克制的專業感 */
+    --brand:#84BD00; --brand-hover:#5D8500; --brand-light:#EAF6D3; --brand-lighter:#F7FBEF;
+    --brand-deep:#4A6B00;
+    /* 中性色階：頁面底色跟卡片底色故意分開（頁面用極淺的暖灰、卡片維持純白），
+       卡片才會有「浮起來」的層次感，不會整片死白看起來很平。 */
+    --bg:#F7F8F5; --panel:#FFFFFF; --panel-2:#F6F8F3; --border:#E7E9E4; --border-soft:#EFF1EC;
+    --text:#373B3E; --text-heading:#1E2023; --text-dim:#75787B; --text-faint:#A7AAAC;
+    /* 等級色（語意色，維持辨識度） */
+    --grade-s:#7A5CC0; --grade-a:#84BD00; --grade-b:#3B7FC4; --grade-c:#C99A1E; --grade-d:#C24A3F;
+    --grade-s-dim:#F1EDFA; --grade-a-dim:#EAF6D3; --grade-b-dim:#E9F1FA; --grade-c-dim:#FAF1DC; --grade-d-dim:#FBEAE8;
+    /* 統一圓角、陰影階，全站共用，看起來才會一致 */
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --shadow-sm:0 1px 2px rgba(30,32,35,0.05);
+    --shadow-md:0 2px 8px rgba(30,32,35,0.06), 0 1px 2px rgba(30,32,35,0.04);
+    --shadow-lg:0 12px 32px rgba(30,32,35,0.10), 0 2px 8px rgba(30,32,35,0.05);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  *::-webkit-scrollbar{width:9px; height:9px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  *::-webkit-scrollbar-thumb{background:#D7DBD1; border-radius:99px; border:2px solid var(--bg);}
+  *::-webkit-scrollbar-thumb:hover{background:#C2C7B9;}
+  body{ background:var(--bg); color:var(--text); font-family:'Inter','Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif; min-height:100vh; padding:24px 28px 60px; line-height:1.6; -webkit-font-smoothing:antialiased; letter-spacing:0.1px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; padding-bottom:18px; border-bottom:1px solid var(--border-soft); }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-badge{ width:38px; height:38px; border-radius:11px; background:linear-gradient(150deg, var(--brand) 0%, var(--brand-deep) 100%); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; color:#FFFFFF; box-shadow:0 3px 10px rgba(93,133,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25); letter-spacing:0.3px; }
+  .brand h1{font-size:18px; font-weight:700; color:var(--text-heading); letter-spacing:-0.2px;}
+  .brand p{font-size:12px; color:var(--text-dim); margin-top:1px;}
+  .top-controls{display:flex; align-items:center; gap:10px; font-size:12px; color:var(--text-dim); flex-wrap:wrap;}
+  .status-dot{width:7px; height:7px; border-radius:50%; background:var(--brand); display:inline-block; margin-right:6px; box-shadow:0 0 0 3px var(--brand-light);}
+  .btn{ background:#FFFFFF; border:1px solid var(--border); color:var(--text); padding:7px 12px; border-radius:var(--r-sm); font-size:12px; cursor:pointer; font-family:inherit; transition:border-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out; }
+  .btn:hover{border-color:var(--brand); color:var(--brand-hover); box-shadow:var(--shadow-sm);}
+  select.run-select{
+    background:#FFFFFF; border:1px solid var(--border); color:var(--text);
+    padding:7px 12px; border-radius:var(--r-sm); font-size:12px; font-family:inherit; min-width:220px;
+  }
+
+  .kpi-row{ display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:16px; }
+  .kpi-row.kpi-row-4{ grid-template-columns:repeat(4,1fr); }
+  .kpi-card{ background:var(--panel); border:1px solid var(--border); border-radius:var(--r-md); padding:16px 18px; min-height:120px; display:flex; flex-direction:column; justify-content:space-between; transition:box-shadow 180ms ease-out, transform 180ms ease-out, border-color 180ms ease-out; }
+  .kpi-card:hover{ box-shadow:var(--shadow-md); transform:translateY(-1px); border-color:var(--border-soft); }
+  .kpi-label{font-size:12px; color:var(--text-dim); margin-bottom:8px; font-weight:500;}
+  .kpi-value{font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-size:29px; font-weight:700; color:var(--text-heading); white-space:nowrap; overflow:hidden; letter-spacing:-0.5px;}
+  .kpi-sub{font-size:11px; color:var(--text-faint); margin-top:4px;}
+
+  .grid-2{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-bottom:14px; }
+  .grid-2-equal{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .category-legend{ display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:120px; overflow-y:auto; }
+  .category-legend-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-dim); }
+  .legend-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .legend-label{ flex:1; font-weight:600; color:var(--text-heading); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .legend-pct{ color:var(--text-faint); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .panel{ background:var(--panel); border:1px solid var(--border); border-radius:var(--r-md); padding:18px 20px; }
+  .pager{ display:flex; align-items:center; justify-content:center; gap:12px; margin-top:12px; }
+  .pager:empty{ display:none; }
+  .pager-btn{ font-size:12px; padding:5px 12px; border-radius:var(--r-sm); border:1px solid var(--border); background:var(--panel); color:var(--text-dim); cursor:pointer; transition:border-color 150ms ease-out, color 150ms ease-out; }
+  .pager-btn:hover:not(:disabled){ background:var(--panel-2); border-color:var(--brand); color:var(--brand-hover); }
+  .pager-btn:disabled{ opacity:0.4; cursor:default; }
+  .pager-info{ font-size:12px; color:var(--text-faint); }
+  .panel-title{ font-size:13.5px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; color:var(--text-heading); letter-spacing:-0.1px; }
+  .panel-title .tag{ font-size:10px; color:var(--text-faint); font-weight:400; margin-left:auto; }
+
+  .grade-row{display:flex; gap:8px; margin-bottom:14px;}
+  .grade-pill{ flex:1; text-align:center; padding:10px 6px; border-radius:var(--r-sm); }
+  .grade-pill .g{font-family:'Inter',sans-serif; font-size:20px; font-weight:700;}
+  .grade-pill .n{font-size:11px; color:var(--text-dim); margin-top:2px;}
+  .btn-grade-filter{
+    border:none; padding:7px 16px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif;
+    opacity:0.55; transition:opacity 150ms ease-out;
+  }
+  .btn-grade-filter:hover{opacity:0.8;}
+  .btn-grade-filter.active{opacity:1; box-shadow:0 0 0 2px currentColor;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{ text-align:left; font-size:10.5px; color:var(--text-faint); font-weight:700; text-transform:uppercase; letter-spacing:0.5px; padding:0 8px 10px; border-bottom:1px solid var(--border); }
+  .sortable-th{ cursor:pointer; user-select:none; }
+  .sortable-th:hover{ color:var(--text); }
+  .sort-icon{ font-size:10px; color:var(--text-faint); }
+  .sort-icon.active{ color:var(--brand-hover); }
+  tbody tr{ transition:background 120ms ease-out; }
+  tbody tr:hover{ background:var(--panel-2); }
+  .btn-row-action{
+    background:#FFFFFF; border:1px solid var(--border); color:var(--text-dim);
+    padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:inherit; margin-left:6px;
+    transition:border-color 150ms ease-out, color 150ms ease-out;
+  }
+  .btn-row-action:hover{border-color:var(--grade-b); color:var(--grade-b);}
+  .btn-row-action.send:hover{border-color:var(--brand); color:var(--brand-hover);}
+  .reeval-tip{ position:relative; }
+  .reeval-tip:hover{ border-color:var(--grade-c); color:var(--grade-c); }
+  .reeval-tip:hover::after{
+    content:attr(data-tip); position:absolute; right:0; left:auto; top:130%; z-index:80;
+    width:260px; max-width:80vw; white-space:normal; word-break:break-word;
+    background:var(--panel); color:var(--text-dim); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6;
+    box-shadow:var(--shadow-lg); text-align:left; font-weight:400;
+  }
+  .hint-tip{ position:relative; }
+  .hint-tip:hover::after{
+    content:attr(data-tip); position:absolute; right:0; left:auto; top:calc(100% + 6px); z-index:80;
+    width:250px; max-width:80vw; white-space:normal; word-break:break-word;
+    background:var(--panel); color:var(--text-dim); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6;
+    box-shadow:var(--shadow-lg); text-align:left; font-weight:400;
+  }
+  .info-tip{
+    display:inline-block; position:relative; cursor:help; color:var(--text-faint);
+    font-size:11px; font-weight:400; vertical-align:middle;
+  }
+  .info-tip:hover{ color:var(--text-dim); }
+  .info-tip:hover::after{
+    content:attr(data-tip); position:absolute; left:0; right:auto; top:130%; z-index:80;
+    width:230px; max-width:75vw; white-space:normal; word-break:break-word;
+    background:var(--panel); color:var(--text-dim); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6;
+    box-shadow:var(--shadow-lg); text-align:left; font-weight:400;
+  }
+  .copy-email-btn{
+    position:relative; display:inline-block;
+    background:#FFFFFF; border:1px solid var(--border); color:var(--text-dim);
+    padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:inherit;
+  }
+  .copy-email-btn:hover{border-color:var(--grade-b); color:var(--grade-b);}
+  .copy-email-btn:hover::after{
+    content:attr(data-tip); position:absolute; right:0; left:auto; top:135%; z-index:60;
+    width:220px; max-width:70vw; white-space:normal; word-break:break-all;
+    background:var(--panel); color:var(--text-dim); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:8px 10px; font-size:12px; line-height:1.5;
+    box-shadow:var(--shadow-lg);
+  }
+  .status-select{
+    font-family:inherit; font-size:11px; font-weight:600; padding:3px 22px 3px 8px;
+    border-radius:5px; border:1px solid transparent; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M2.5 4.5L6 8l3.5-3.5z'/></svg>");
+    background-repeat:no-repeat; background-position:right 6px center; background-size:10px;
+  }
+  .status-select:hover{ opacity:0.85; }
+  .status-select:disabled{ opacity:0.6; cursor:wait; }
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(20,22,20,0.5); backdrop-filter:blur(2px); z-index:7000;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    background:#FFFFFF; border-radius:var(--r-lg); width:100%; max-width:640px; max-height:88vh;
+    display:flex; flex-direction:column; box-shadow:var(--shadow-lg);
+  }
+  .modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px; border-bottom:1px solid var(--border);
+  }
+  .modal-header h3{ font-size:15px; font-weight:700; color:var(--text-heading); margin:0; }
+  .modal-close-btn{
+    background:none; border:none; font-size:20px; line-height:1; color:var(--text-faint);
+    cursor:pointer; padding:2px 6px;
+  }
+  .modal-close-btn:hover{ color:var(--text-dim); }
+  .modal-body{ padding:20px 22px; overflow-y:auto; flex:1; }
+  .modal-footer{
+    display:flex; justify-content:flex-end; gap:10px;
+    padding:16px 22px; border-top:1px solid var(--border);
+  }
+  .job-status-bar{
+    position:fixed; left:20px; bottom:20px; z-index:6000;
+    background:var(--text-heading); color:#fff; padding:12px 18px; border-radius:var(--r-md);
+    font-size:13px; font-weight:600; box-shadow:var(--shadow-lg);
+    display:flex; align-items:center; gap:10px; max-width:380px; line-height:1.5;
+  }
+  .job-status-bar .spinner{
+    width:14px; height:14px; border-radius:50%; flex-shrink:0;
+    border:2px solid rgba(255,255,255,0.35); border-top-color:#fff;
+    animation:job-spin 0.8s linear infinite;
+  }
+  @keyframes job-spin{ to{ transform:rotate(360deg); } }
+  .btn-status-filter{
+    border:1px solid var(--border); background:#FFFFFF; color:var(--text-dim);
+    padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-family:inherit;
+    transition:border-color 150ms ease-out, color 150ms ease-out, background 150ms ease-out;
+  }
+  .btn-status-filter .count{font-weight:700; margin-left:4px;}
+  .btn-status-filter:hover{border-color:var(--brand); color:var(--brand-hover);}
+  .btn-status-filter.active{background:var(--brand); border-color:var(--brand); color:#fff; box-shadow:var(--shadow-sm);}
+  .email-history-row td{background:var(--panel-2); padding:10px 14px;}
+  .email-history-item{ display:flex; gap:10px; align-items:baseline; padding:6px 0; border-bottom:1px dashed var(--border); font-size:12px; }
+  .email-history-item:last-child{border-bottom:none;}
+  .email-history-item .eh-time{color:var(--text-faint); white-space:nowrap; min-width:96px;}
+  .email-history-item .eh-status{ font-weight:600; padding:1px 7px; border-radius:5px; font-size:11px; white-space:nowrap; }
+  .email-history-item .eh-subject{color:var(--text-dim); overflow:hidden; text-overflow:ellipsis;}
+  .btn-link{ background:none; border:none; color:var(--grade-b); font-size:11px; cursor:pointer; font-family:inherit; padding:0; margin-left:6px; text-decoration:underline; }
+  td{padding:9px 8px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text);}
+  tr:last-child td{border-bottom:none;}
+  .company-name{font-weight:600; color:var(--text-heading);}
+  .company-site{font-size:11px; color:var(--text-faint); margin-top:2px;}
+  .company-country{font-weight:700; color:var(--brand-hover);}
+  .score-pill{ font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; font-size:12px; display:inline-block; padding:2px 8px; border-radius:6px; }
+
+  .country-card{ background:var(--panel-2); border-radius:var(--r-sm); padding:12px 14px; margin-bottom:10px; border:1px solid transparent; transition:border-color 150ms ease-out; }
+  .country-card:hover{ border-color:var(--border-soft); }
+  .country-card:last-child{margin-bottom:0;}
+  .country-card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; cursor:pointer; user-select:none;}
+  .country-card:not(.expanded) .country-card-top{margin-bottom:0;}
+  .expand-caret{font-size:11px; color:var(--text-faint); margin-left:6px;}
+  .country-updated-mini{font-size:10px; color:var(--text-faint); font-weight:400; margin-left:9px;}
+  .country-card-detail{margin-top:2px;}
+  .country-name{font-weight:700; font-size:14px; color:var(--text-heading); letter-spacing:-0.1px;}
+  .country-score{font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:700; font-size:16px;}
+  .country-reason{font-size:12px; color:var(--text-dim); line-height:1.5;}
+  .brief-box{ margin-top:8px; padding:8px 10px; background:var(--panel); border-radius:var(--r-sm); border:1px solid var(--border); }
+  .brief-label{ font-size:11px; font-weight:700; color:var(--text-faint); margin-bottom:3px; letter-spacing:.3px; }
+  .reason-tip{ position:relative; display:inline-block; margin-left:8px; font-size:11px; color:var(--text-faint); cursor:help; border-bottom:1px dotted var(--text-faint); vertical-align:middle; font-weight:500; }
+  .reason-tip:hover::after{ content:attr(data-tip); position:absolute; right:0; left:auto; top:150%; z-index:60; width:300px; max-width:78vw; white-space:normal; word-break:break-word; background:var(--panel); color:var(--text-dim); border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6; box-shadow:var(--shadow-lg); }
+  .action-type-tip{ position:relative; display:inline-block; cursor:help; border-bottom:1px dotted var(--text-faint); }
+  .action-type-tip:hover::after{ content:attr(data-tip); position:absolute; right:0; left:auto; top:135%; z-index:60; width:260px; max-width:75vw; white-space:normal; word-break:break-word; background:var(--panel); color:var(--text-dim); border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6; box-shadow:var(--shadow-lg); }
+
+  #map{ height:340px; border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--border); }
+  .map-caption{font-size:11px; color:var(--text-faint); margin-top:8px;}
+
+  .empty-state{ text-align:center; padding:30px 20px; color:var(--text-faint); font-size:13px; }
+  .setup-box{ max-width:520px; margin:80px auto; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-lg); padding:28px 30px; box-shadow:var(--shadow-lg); }
+  .setup-box h2{font-size:16px; margin-bottom:8px; color:var(--text-heading);}
+  .setup-box p{font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:16px;}
+  .setup-box input{ width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:var(--r-sm); font-size:13px; font-family:'Inter',sans-serif; margin-bottom:12px; }
+  .setup-box .btn{width:100%; text-align:center; background:var(--brand); border-color:var(--brand); color:#fff; padding:10px; font-weight:600;}
+  .setup-box .btn:hover{background:var(--brand-hover); border-color:var(--brand-hover); color:#fff;}
+  .setup-box .btn.btn-secondary{background:transparent; border-color:var(--border); color:var(--text-dim);}
+  .setup-box .btn.btn-secondary:hover{background:transparent; border-color:var(--brand); color:var(--brand-hover);}
+  .hidden{display:none !important;}
+  .error-banner{ background:var(--grade-d-dim); border:1px solid var(--grade-d); color:var(--grade-d); padding:10px 14px; border-radius:var(--r-sm); font-size:12px; margin-bottom:16px; }
+  .panel, .kpi-card{ box-shadow:var(--shadow-sm); }
+
+  body{ padding:0; }
+  .app-layout{ display:flex; min-height:100vh; }
+  .sidebar{
+    width:264px; flex-shrink:0; background:var(--panel); border-right:1px solid var(--border-soft);
+    padding:18px 18px; display:flex; flex-direction:column; gap:13px;
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .sidebar h2{font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:7px;}
+  .field-group{display:flex; flex-direction:column; gap:4px;}
+  .field-group label{font-size:12px; color:var(--text-dim);}
+  .field-group input{
+    background:#FFFFFF; border:1px solid var(--border); color:var(--text);
+    padding:7px 10px; border-radius:var(--r-sm); font-size:13px; font-family:inherit;
+    transition:border-color 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .field-group input:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-light);}
+  .mini-search-input{
+    background:#FFFFFF; border:1px solid var(--border); color:var(--text);
+    padding:6px 10px; border-radius:var(--r-sm); font-size:12px; font-family:inherit; width:100%;
+    transition:border-color 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .mini-search-input:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-light);}
+  .country-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .country-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--brand-light); color:var(--brand-hover); font-size:12px; font-weight:600; padding:4px 6px 4px 10px; border-radius:14px; }
+  .country-chip button{ background:none; border:none; color:var(--brand-hover); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; font-family:inherit; }
+  .country-chip button:hover{ color:var(--grade-d); }
+  .country-dropdown{ position:absolute; top:100%; left:0; right:0; z-index:2000; background:#FFFFFF; border:1px solid var(--border); border-radius:var(--r-sm); margin-top:4px; max-height:220px; overflow-y:auto; box-shadow:var(--shadow-lg); }
+  .combobox-toggle-btn{
+    position:absolute; right:4px; top:0; bottom:0; z-index:5; width:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--text-faint); font-size:11px; cursor:pointer;
+    padding:0; line-height:1; font-family:inherit;
+  }
+  .combobox-toggle-btn:hover{ color:var(--text-dim); }
+  .country-dropdown.hidden{ display:none; }
+  .country-option{ padding:8px 12px; font-size:13px; cursor:pointer; color:var(--text); transition:background 100ms ease-out; }
+  .mode-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+  .country-option-sticky{
+    position:sticky; top:0; z-index:1; background:#FFFFFF;
+    font-weight:700; color:var(--brand-hover);
+    border-bottom:1px solid var(--border);
+  }
+  .country-option:hover{ background:var(--panel-2); }
+  .country-option .match{ font-weight:700; color:var(--brand-hover); }
+  .country-dropdown-empty{ padding:8px 12px; font-size:12px; color:var(--text-faint); }
+  .btn-primary{ background:var(--brand); border:none; color:#fff; font-weight:600; padding:8px; border-radius:var(--r-sm); font-size:13px; cursor:pointer; font-family:inherit; transition:background 150ms ease-out, box-shadow 150ms ease-out, transform 150ms ease-out; box-shadow:0 2px 6px rgba(93,133,0,0.22); }
+  .btn-primary:hover{background:var(--brand-hover); box-shadow:0 3px 10px rgba(93,133,0,0.3); transform:translateY(-1px);}
+  .grade-btn-row{display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:8px;}
+  .btn-grade{
+    border:none; padding:6px 6px; border-radius:7px; font-size:12px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .btn-top5{ background:var(--grade-b-dim); color:var(--grade-b); border:1px solid var(--grade-b); padding:7px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
+  .sidebar-note{font-size:11px; color:var(--text-faint); line-height:1.5;}
+  .quicknav{ margin-top:auto; padding-top:12px; border-top:1px solid var(--border-soft); display:flex; flex-direction:column; gap:5px; }
+  .qn-btn{ width:100%; text-align:left; font-size:12px; padding:6px 12px; border-radius:var(--r-sm); border:1px solid var(--border); background:var(--panel); color:var(--text-dim); cursor:pointer; transition:background 150ms ease-out, color 150ms ease-out; }
+  .qn-btn:hover{ background:var(--panel-2); color:var(--text-heading); }
+  .current-country{ border:1px solid var(--border); border-radius:var(--r-sm); padding:7px 10px; margin-bottom:4px; background:var(--panel-2); display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:8px; }
+  .current-country .cc-label{ font-size:10px; color:var(--text-faint); flex-shrink:0; }
+  .current-country .cc-value{ font-size:13px; font-weight:600; color:var(--text-heading); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .toast{
+    position:fixed; bottom:20px; left:284px; background:#FFFFFF; border:1px solid var(--border);
+    padding:12px 16px; border-radius:var(--r-sm); font-size:13px; color:var(--text); z-index:6000; max-width:400px;
+    box-shadow:var(--shadow-lg);
+  }
+  .toast.error{border-color:var(--grade-d); color:var(--grade-d);}
+  .toast.success{border-color:var(--brand); color:var(--brand-hover);}
+  .main-content{flex:1; padding:24px 28px 60px; min-width:0;}
+  @media (max-width:900px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    .grid-2-equal{grid-template-columns:1fr;}
+    /* 手機版:側邊欄不再固定卡住、改成正常堆疊,整個頁面用同一個捲軸 */
+    .app-layout{ flex-direction:column; }
+    .sidebar{ width:100%; height:auto; position:static; overflow:visible; border-right:none; border-bottom:1px solid var(--border-soft); }
+    .main-content{ padding:16px 14px 80px; }
+  }
+.fab-top{ position:fixed; right:18px; bottom:18px; z-index:3000; width:44px; height:44px; border-radius:50%; border:none; background:var(--brand,#5D8500); color:#fff; font-size:20px; line-height:44px; text-align:center; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.25); opacity:0; pointer-events:none; transition:opacity 200ms ease; }
+  .fab-top.show{ opacity:1; pointer-events:auto; }
+</style>
+</head>
+<body>
+
+<div id="setupScreen" class="setup-box">
+  <h2>連接你的 n8n 儀表板 API</h2>
+  <p>貼上 n8n Webhook 的完整網址（流程裡「Webhook_儀表板資料入口」節點的 Production URL），只需設定一次。</p>
+  <input id="webhookInput" type="text" placeholder="https://你的n8n網域/webhook/dashboard-data">
+  <button class="btn" onclick="saveWebhook()">連接並載入資料</button>
+  <button class="btn btn-secondary" style="margin-top:8px;" onclick="testInNewTab()">在新分頁直接開啟網址測試</button>
+  <div id="setupError" class="error-banner hidden" style="margin-top:14px;"></div>
+</div>
+
+<div id="dashboard" class="hidden app-layout">
+  <div class="sidebar">
+    <div>
+      <h2>啟動新搜尋</h2>
+      <div class="field-group" style="margin-bottom:8px;" id="countryFieldWrap">
+        <label>國家</label>
+        <div style="position:relative;">
+          <input id="inputCountries" type="text" placeholder="輸入國家名稱搜尋，如 U" autocomplete="off" style="padding-right:28px; width:100%;"
+            oninput="onCountrySearchInput()" onfocus="this.select(); onCountrySearchInput(true)" onkeydown="onCountrySearchKeydown(event)">
+          <button type="button" class="combobox-toggle-btn" onclick="toggleCountrySearchDropdown(event)" aria-label="展開或收合國家清單">▾</button>
+          <div id="countryDropdown" class="country-dropdown hidden"></div>
+        </div>
+      </div>
+      <div class="field-group" style="margin-bottom:8px;" id="productAttrFieldWrap">
+        <label>商品種類 <span class="info-tip" data-tip="僅用於②企業搜尋與篩選，可直接打字或從下拉選單挑之前用過的">ⓘ</span></label>
+        <div style="position:relative;">
+          <input id="inputProductAttr" type="text" placeholder="Hair Care" autocomplete="off" style="padding-right:28px; width:100%;"
+            oninput="onProductAttrInput()" onfocus="this.select(); onProductAttrInput(true)" onkeydown="onProductAttrKeydown(event)">
+          <button type="button" class="combobox-toggle-btn" onclick="toggleProductAttrDropdown(event)" aria-label="展開或收合商品種類清單">▾</button>
+          <div id="productAttrDropdown" class="country-dropdown hidden"></div>
+        </div>
+      </div>
+      <button class="btn-primary hint-tip" style="width:100%;" data-tip="①不吃上面的商品種類，固定用歐萊德全品項去查，同一國家不會因為品項不同而評分不一致" onclick="startRun()">① 國家背景調查</button>
+      <button class="btn-primary hint-tip" style="width:100%; margin-top:8px;" data-tip="②用「商品種類」篩選候選公司，只會從①已完成國家背景調查、且有找到候選名單的國家裡篩選；沒填商品種類就用預設條件搜尋" onclick="startCompanies()">② 企業搜尋與篩選</button>
+    </div>
+
+    <div style="margin-top:14px;">
+      <h2>寄送Email</h2>
+      <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-dim); margin:-4px 0 10px; cursor:pointer;">
+        <input type="checkbox" id="reviewToggle" onchange="onReviewToggle()" style="width:14px; height:14px; cursor:pointer;">
+        審核機制（開啟後寄送前逐封審核）
+      </label>
+      <div class="grade-btn-row">
+        <button class="btn-grade" style="background:var(--grade-s-dim); color:var(--grade-s);" onclick="sendGradeEmails('S')">寄S級</button>
+        <button class="btn-grade" style="background:var(--grade-a-dim); color:var(--grade-a);" onclick="sendGradeEmails('A')">寄A級</button>
+        <button class="btn-grade" style="background:var(--grade-b-dim); color:var(--grade-b);" onclick="sendGradeEmails('B')">寄B級</button>
+        <button class="btn-grade" style="background:var(--grade-c-dim); color:var(--grade-c);" onclick="sendGradeEmails('C')">寄C級</button>
+        <button class="btn-grade" style="background:var(--grade-d-dim); color:var(--grade-d); grid-column:span 2;" onclick="sendGradeEmails('D')">寄D級</button>
+      </div>
+      <button class="btn-top5" style="width:100%;" onclick="sendTop5Digest()">Top5總分草稿寄給自己</button>
+    </div>
+
+    <div class="quicknav">
+      <h2>快速跳轉</h2>
+      <div id="currentCountryBox" class="current-country hidden">
+        <span class="cc-label">您目前在</span>
+        <span class="cc-value" id="currentCountryName"></span>
+      </div>
+      <a class="qn-btn" href="#page-top" style="display:block; text-align:center; text-decoration:none;">↑ 回到最上面</a>
+      <a class="qn-btn" href="#panel-companies" style="display:block; text-align:center; text-decoration:none;">公司清單</a>
+      <a class="qn-btn" href="#panel-contact" style="display:block; text-align:center; text-decoration:none;">信件管理中心</a>
+      <a class="qn-btn" href="#panel-worklog" style="display:block; text-align:center; text-decoration:none;">活動紀錄</a>
+    </div>
+  </div>
+
+  <div class="main-content">
+  <div class="topbar" id="page-top">
+    <div class="brand">
+      <div class="brand-badge">AI</div>
+      <div>
+        <h1>業務開發儀表板</h1>
+        <p>市場開發自動化 · 即時資料</p>
+      </div>
+    </div>
+    <div class="top-controls">
+      <span style="color:var(--text-faint); font-size:12px;">選擇國家：</span>
+      <div style="position:relative; width:180px; display:inline-block;" id="countrySelectWrap">
+        <input id="countrySelectInput" class="mini-search-input" type="text" placeholder="全球總覽" autocomplete="off" style="padding-right:26px; width:100%;"
+          oninput="onCountrySelectInput()" onfocus="this.select(); onCountrySelectInput(true)" onkeydown="onCountrySelectKeydown(event)">
+        <button type="button" class="combobox-toggle-btn" onclick="toggleCountrySelectDropdown(event)" aria-label="展開或收合國家清單">▾</button>
+        <div id="countrySelectDropdown" class="country-dropdown hidden"></div>
+      </div>
+      <span style="color:var(--text-faint); font-size:12px;">該國運作狀態：</span>
+      <select id="countryModeSelect" class="run-select" style="min-width:110px;" onchange="onCountryModeChange()">
+        <option value="manual" style="color:var(--grade-a);" title="國家背景查詢、抓取候選公司、寄送開發信，三個步驟都要你自己手動觸發，系統不會自動做任何事。">● 純手動</option>
+        <option value="semi_auto" style="color:var(--grade-c);" title="系統會定期自動執行「①國家背景查詢」跟「②抓取候選公司」，但每封開發信還是要你手動確認後才會寄出。">● 半自動</option>
+        <option value="full_auto" style="color:var(--grade-d);" title="系統會定期自動執行「①國家背景查詢」「②抓取候選公司」「③寄送開發信」，全程不需要你手動介入。">● 全自動</option>
+      </select>
+      <span><span class="status-dot"></span>更新於 <span id="lastUpdated">—</span></span>
+      <button class="btn" onclick="loadData()">重新整理</button>
+      <button class="btn" onclick="resetWebhook()">變更連線</button>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="error-banner hidden"></div>
+
+  <div class="grid-2" style="align-items:stretch;">
+    <div>
+      <div class="kpi-row" id="kpiRow" style="margin-bottom:14px;">
+        <div class="kpi-card">
+          <div class="kpi-label">聯絡百分比</div>
+          <div class="kpi-value" id="kpiContactedPct">—%</div>
+          <div class="kpi-sub" id="kpiContacted">— / —</div>
+          <div class="kpi-sub">已聯絡／候選總數</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">回覆百分比</div>
+          <div class="kpi-value" id="kpiRepliedPct">—%</div>
+          <div class="kpi-sub" id="kpiReplied">— / —</div>
+          <div class="kpi-sub">已回覆／已聯絡</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均總分</div>
+          <div class="kpi-value" id="kpiAvgScore">—</div>
+          <div class="kpi-sub">PASS公司平均分</div>
+        </div>
+        <div class="kpi-card" id="kpiCardCountries">
+          <div class="kpi-label">累計評估國家數</div>
+          <div class="kpi-value" id="kpiCountries">—</div>
+          <div class="kpi-sub">目前涵蓋國家</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">P1最優先</div>
+          <div class="kpi-value" id="kpiP1">—</div>
+          <div class="kpi-sub">建議優先聯繫</div>
+        </div>
+      </div>
+
+      <div class="grid-2-equal">
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-title">等級分布 <span class="tag">S / A / B / C / D</span></div>
+          <div class="grade-row" id="gradeRow"></div>
+          <div style="position:relative; height:140px;"><canvas id="gradeChart"></canvas></div>
+        </div>
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-title">分類分布 <span class="tag">候選公司分類佔比</span></div>
+          <div style="position:relative; height:150px;"><canvas id="categoryChart"></canvas></div>
+          <div id="categoryLegend" class="category-legend"></div>
+          <div id="categoryChartEmpty" class="empty-state hidden">目前沒有候選公司資料。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title" style="justify-content:space-between; flex-wrap:wrap;">
+        <span>國家投資簡介 <span class="tag">Tavily分析＋近30天新聞</span></span>
+        <div style="position:relative; width:200px;" id="countryBriefSearchWrap">
+          <input id="countryBriefSearchInput" class="mini-search-input" type="text" placeholder="搜尋國家..." autocomplete="off" style="padding-right:26px; width:100%;"
+            oninput="onCountryBriefSearchInput()" onfocus="this.select(); onCountryBriefSearchInput(true)" onkeydown="onCountryBriefSearchKeydown(event)">
+          <button type="button" class="combobox-toggle-btn" onclick="toggleCountryBriefSearchDropdown(event)" aria-label="展開或收合國家清單">▾</button>
+          <div id="countryBriefDropdown" class="country-dropdown hidden"></div>
+        </div>
+      </div>
+      <div id="countryBrief"></div>
+      <div id="countryBriefEmpty" class="empty-state hidden">這個國家還沒有市場評分資料。</div>
+      <div id="countryBriefPager" class="pager"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px; margin-bottom:14px;">
+    <div class="panel-title">候選公司地理分布 <span class="tag">綠點＝找到的公司概略位置；綠色國家＝已做過國家投資簡介</span></div>
+    <div id="map"></div>
+    <div class="map-caption">位置根據AI判斷的所在地文字概略定位，非精確地址，僅供參考分布密度用。</div>
+  </div>
+
+  <div class="panel" id="panel-companies" style="margin-bottom:14px;">
+    <div class="panel-title" style="justify-content:space-between;">
+      <span>公司清單</span>
+      <button class="btn" style="font-size:11px; padding:5px 10px;" onclick="openReEvaluateModal()">重新評估</button>
+    </div>
+    <div class="grade-filter-row" id="gradeFilterRow" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;"></div>
+    <table>
+      <thead><tr><th>公司</th><th>等級</th><th class="sortable-th" onclick="toggleSort('score')" id="thScore">總分 <span id="sortIconScore" class="sort-icon"></span></th><th class="sortable-th" onclick="toggleSort('category')" id="thCategory">分類 <span id="sortIconCategory" class="sort-icon"></span></th><th>優勢</th><th>風險</th><th>建議行動</th></tr></thead>
+      <tbody id="gradeBrowseBody"></tbody>
+    </table>
+    <div id="gradeBrowseEmpty" class="empty-state">請點上方按鈕，顯示公司清單。</div>
+    <div id="gradeBrowsePager" class="pager"></div>
+  </div>
+
+  <div class="panel" id="panel-contact" style="margin-bottom:14px;">
+    <div class="panel-title">信件管理中心 <span class="tag">聯繫進度，依聯繫狀態篩選</span></div>
+    <div id="contactFilterRow" style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;"></div>
+    <table>
+      <thead><tr><th>公司</th><th>分類</th><th>等級／總分</th><th class="sortable-th" onclick="toggleContactSort('status')" id="thContactStatus">聯繫狀態 <span id="sortIconContactStatus" class="sort-icon"></span></th><th>最近寄送時間</th><th>最近信件主旨</th><th style="text-align:right; width:175px; max-width:175px; white-space:nowrap;">操作</th></tr></thead>
+      <tbody id="contactCenterBody"></tbody>
+    </table>
+    <div id="contactCenterEmpty" class="empty-state hidden">目前沒有符合條件的公司。</div>
+    <div id="contactPager" class="pager"></div>
+  </div>
+
+  <div class="panel" id="panel-worklog">
+    <div class="panel-title">使用紀錄 <span class="tag">Hunter / Tavily 最近查詢</span></div>
+    <table>
+      <thead><tr><th>來源</th><th>查詢對象</th><th>結果</th><th>摘要</th><th>時間</th></tr></thead>
+      <tbody id="worklogBody"></tbody>
+    </table>
+    <div id="worklogEmpty" class="empty-state hidden">還沒有查詢紀錄。</div>
+    <div id="worklogPager" class="pager"></div>
+  </div>
+  </div>
+</div>
+
+<div id="reEvaluateModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>重新評估既有公司</h3>
+      <button type="button" class="modal-close-btn" onclick="closeReEvaluateModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px; color:var(--text-dim); background:var(--panel-2); border-radius:var(--r-sm); padding:9px 12px; margin-bottom:14px;">
+        目前範圍：<strong id="reEvalScopeLabel" style="color:var(--text-heading);">全球總覽</strong>
+        <span style="display:block; margin-top:4px; color:var(--text-faint); font-size:11px;">不重抓官網，用既有資料依新規則重新生成優勢／風險／建議行動／評分，Email、社群媒體、公司名稱、官網不會被更動。</span>
+      </div>
+      <div class="field-group" style="margin-bottom:14px;">
+        <label>選擇方式</label>
+        <select id="reEvalMode" class="run-select" style="width:100%;" onchange="onReEvalModeChange()">
+          <option value="all">全部（目前範圍內的所有公司）</option>
+          <option value="companies">個別挑選公司</option>
+        </select>
+      </div>
+      <div id="reEvalCompanyListWrap" style="display:none;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text-heading); margin-bottom:10px; cursor:pointer; padding-bottom:10px; border-bottom:1px solid var(--border);">
+          <input type="checkbox" id="reEvalSelectAll" onchange="toggleAllReEvalCompanies()" checked style="width:15px; height:15px;"> 全選
+        </label>
+        <div id="reEvalCompanyList" style="display:flex; flex-direction:column; gap:4px; max-height:320px; overflow-y:auto;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeReEvaluateModal()">取消</button>
+      <button type="button" class="btn-primary" id="reEvalStartBtn" onclick="startReEvaluate()">開始重新評估</button>
+    </div>
+  </div>
+</div>
+
+<div id="gradeReviewModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="gradeReviewTitle">選擇要審核的公司</h3>
+      <button type="button" class="modal-close-btn" onclick="closeGradeReviewModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text-heading); margin-bottom:10px; cursor:pointer; padding-bottom:10px; border-bottom:1px solid var(--border);">
+        <input type="checkbox" id="gradeReviewAll" onchange="toggleAllGradeReview()" checked style="width:15px; height:15px;"> 全選
+      </label>
+      <div id="gradeReviewList" style="display:flex; flex-direction:column; gap:4px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeGradeReviewModal()">取消</button>
+      <button type="button" class="btn-primary" id="gradeReviewStartBtn" onclick="startGradeReview()">開始審核</button>
+    </div>
+  </div>
+</div>
+
+<div id="emailPreviewModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>寄出前先確認信件內容</h3>
+      <button type="button" class="modal-close-btn" onclick="closeEmailPreviewModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group" style="margin-bottom:12px;">
+        <label>收件人（目前為測試模式，寄信／草稿都會先寄到你自己的信箱）</label>
+        <input id="previewTo" type="text" readonly style="background:var(--panel-2); color:var(--text-dim);">
+      </div>
+      <div class="field-group" style="margin-bottom:12px;">
+        <label>主旨</label>
+        <input id="previewSubject" type="text">
+      </div>
+      <div class="field-group">
+        <label>內文（可直接編輯）</label>
+        <textarea id="previewBody" rows="16" style="background:#FFFFFF; border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; line-height:1.6;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeEmailPreviewModal()">取消</button>
+      <button type="button" class="btn" id="previewSkipBtn" onclick="skipReviewItem()" style="display:none;">跳過此封 ↓</button>
+      <button type="button" class="btn-primary" id="previewConfirmBtn" onclick="confirmSendPreview()">確認寄出</button>
+    </div>
+  </div>
+</div>
+
+<div id="jobStatusBar" class="job-status-bar hidden">
+  <span class="spinner"></span>
+  <span id="jobStatusText">處理中...</span>
+  <button type="button" onclick="stopJobTracking(); hideJobStatus();" title="不想等了，關閉這個提示" style="background:none; border:none; color:rgba(255,255,255,0.6); cursor:pointer; font-size:15px; line-height:1; padding:0 0 0 4px;">×</button>
+</div>
+
+<script>
+let gradeChartInstance = null;
+let categoryChartInstance = null;
+const CATEGORY_PALETTE = ['#84BD00','#3B7FC4','#7A5CC0','#C99A1E','#C24A3F','#2FA88E','#E07B39','#5B8DEF','#B4557A','#6FA8A0','#9C6ADE','#D4A574'];
+
+// ===== 國家搜尋式多選（取代自由輸入文字，確保打的名字跟後端ISO對照表100%一致）=====
+// 這份清單刻意跟 n8n「轉換國家代碼(ISO)」節點裡的英文對照表一一對應，
+// 使用者只能從這裡點選，就不會再打出後端認不得的名稱（例如"UK"沒問題，
+// 但這裡直接給"United Kingdom"這個對照表100%認得的正式名稱，從源頭杜絕打錯字）。
+const COUNTRY_OPTIONS = [
+  'Germany','France','Japan','Taiwan','United States','United Kingdom','Italy','Spain','Netherlands',
+  'Belgium','Switzerland','Austria','Sweden','Norway','Denmark','Finland','Poland','Portugal','Ireland',
+  'South Korea','China','Hong Kong','Singapore','Malaysia','Thailand','Vietnam','Indonesia','Philippines',
+  'India','Australia','New Zealand','Canada','Mexico','Brazil','Argentina','South Africa',
+  'United Arab Emirates','Saudi Arabia','Israel','Turkey','Greece','Czech Republic','Hungary','Romania'
+].sort();
+
+// 中文國名對照表，涵蓋跟 COUNTRY_OPTIONS 完全一樣的44個國家。
+// 只用在「顯示文字」，內部比對、送給n8n的實際值都還是維持英文，不會因為改成雙語顯示而影響後端辨識。
+const COUNTRY_ZH_NAMES = {
+  'Germany':'德國','France':'法國','Japan':'日本','Taiwan':'台灣','United States':'美國','United Kingdom':'英國',
+  'Italy':'義大利','Spain':'西班牙','Netherlands':'荷蘭','Belgium':'比利時','Switzerland':'瑞士','Austria':'奧地利',
+  'Sweden':'瑞典','Norway':'挪威','Denmark':'丹麥','Finland':'芬蘭','Poland':'波蘭','Portugal':'葡萄牙','Ireland':'愛爾蘭',
+  'South Korea':'韓國','China':'中國','Hong Kong':'香港','Singapore':'新加坡','Malaysia':'馬來西亞','Thailand':'泰國',
+  'Vietnam':'越南','Indonesia':'印尼','Philippines':'菲律賓','India':'印度','Australia':'澳洲','New Zealand':'紐西蘭',
+  'Canada':'加拿大','Mexico':'墨西哥','Brazil':'巴西','Argentina':'阿根廷','South Africa':'南非',
+  'United Arab Emirates':'阿拉伯聯合大公國','Saudi Arabia':'沙烏地阿拉伯','Israel':'以色列','Turkey':'土耳其',
+  'Greece':'希臘','Czech Republic':'捷克','Hungary':'匈牙利','Romania':'羅馬尼亞'
+};
+
+// 「德國 (Germany)」這種雙語顯示格式。找不到對照的（例如評分失敗標記、拼法不在44國清單內），
+// 就直接顯示原文，不會硬湊翻譯。
+function countryDisplayName(en){
+  const name = String(en || '').trim();
+  if(!name) return name;
+  const zh = COUNTRY_ZH_NAMES[name];
+  return zh ? (zh + ' (' + name + ')') : name;
+}
+
+// 運作模式對應的顏色跟中文標籤，純手動/半自動/全自動共用這一份，
+// 「該國運作狀態」下拉選單、「選擇國家」選單都會用到同一套配色。
+const COUNTRY_MODE_META = {
+  manual:    { label:'純手動', color:'var(--grade-a)' },
+  semi_auto: { label:'半自動', color:'var(--grade-c)' },
+  full_auto: { label:'全自動', color:'var(--grade-d)' }
+};
+function getCountryMode(country){
+  const saved = localStorage.getItem('countryMode:' + normCountry(country));
+  return COUNTRY_MODE_META[saved] ? saved : 'manual';
+}
+
+let selectedCountries = [];
+
+function addCountry(name){
+  const input = document.getElementById('inputCountries');
+  input.value = name;
+  closeCountryDropdown();
+  input.focus();
+}
+
+// 商品種類：跟國家搜尋一樣的搜尋+下拉選單做法，但這裡選項不是固定清單，
+// 而是從「國家投資簡介」資料裡蒐集所有出現過的商品種類（product_attribute），去重複之後給你選；
+// 同時完全保留自由輸入——選單只是方便回顧之前用過什麼，不會限制你只能打清單裡的字。
+function getKnownProductAttrs(){
+  const set = new Set();
+  ((currentData && currentData.countryList) || []).forEach(c => {
+    const v = String(c.product_attribute || '').trim();
+    if(v) set.add(v);
+  });
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+function closeProductAttrDropdown(){
+  const dd = document.getElementById('productAttrDropdown');
+  if(!dd) return;
+  dd.classList.add('hidden');
+  dd.innerHTML = '';
+}
+
+function onProductAttrInput(forceShowAll){
+  const raw = forceShowAll ? '' : document.getElementById('inputProductAttr').value.trim().toLowerCase();
+  const dd = document.getElementById('productAttrDropdown');
+  const options = getKnownProductAttrs();
+  const matches = raw ? options.filter(o => o.toLowerCase().includes(raw)) : options;
+  dd.innerHTML = '';
+  if(matches.length === 0){
+    dd.innerHTML = '<div class="country-dropdown-empty">' + (options.length === 0 ? '目前還沒有歷史紀錄，直接打字輸入即可' : '沒有符合的項目，直接打字輸入即可') + '</div>';
+  } else {
+    matches.slice(0, 30).forEach(name => {
+      const opt = document.createElement('div');
+      opt.className = 'country-option';
+      opt.textContent = name;
+      opt.onclick = () => selectProductAttr(name);
+      dd.appendChild(opt);
+    });
+  }
+  dd.classList.remove('hidden');
+}
+
+function onProductAttrKeydown(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    closeProductAttrDropdown();
+    document.getElementById('inputProductAttr').blur();
+  } else if(e.key === 'Escape'){
+    closeProductAttrDropdown();
+  }
+}
+
+function selectProductAttr(name){
+  const input = document.getElementById('inputProductAttr');
+  if(input) input.value = name;
+  closeProductAttrDropdown();
+}
+
+function toggleProductAttrDropdown(e){
+  if(e) e.stopPropagation();
+  const dd = document.getElementById('productAttrDropdown');
+  if(dd && !dd.classList.contains('hidden')){
+    closeProductAttrDropdown();
+  } else {
+    document.getElementById('inputProductAttr').focus();
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('productAttrFieldWrap');
+  if(wrap && !wrap.contains(e.target)) closeProductAttrDropdown();
+});
+
+function closeCountryDropdown(){
+  const dd = document.getElementById('countryDropdown');
+  if(!dd) return;
+  dd.classList.add('hidden');
+  dd.innerHTML = '';
+}
+
+// 輸入框旁邊的箭頭按鈕：選單開著就關掉，關著就打開並顯示完整清單
+function toggleCountrySearchDropdown(e){
+  if(e) e.stopPropagation();
+  const dd = document.getElementById('countryDropdown');
+  if(dd && !dd.classList.contains('hidden')){
+    closeCountryDropdown();
+  } else {
+    document.getElementById('inputCountries').focus();
+  }
+}
+
+function onCountrySearchInput(forceShowAll){
+  const raw = forceShowAll ? '' : document.getElementById('inputCountries').value.trim().toLowerCase();
+  const dd = document.getElementById('countryDropdown');
+  const matches = raw
+    ? COUNTRY_OPTIONS.filter(c => c.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[c]||'').includes(raw))
+    : COUNTRY_OPTIONS;
+  dd.innerHTML = '';
+  if(matches.length === 0){
+    dd.innerHTML = '<div class="country-dropdown-empty">找不到符合的國家，請確認拼法或改用相近的中英文名稱</div>';
+  } else {
+    matches.slice(0, 30).forEach(name => {
+      const opt = document.createElement('div');
+      opt.className = 'country-option';
+      opt.textContent = countryDisplayName(name);
+      opt.onclick = () => addCountry(name);
+      dd.appendChild(opt);
+    });
+  }
+  dd.classList.remove('hidden');
+}
+
+function onCountrySearchKeydown(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    const raw = document.getElementById('inputCountries').value.trim().toLowerCase();
+    if(!raw) return;
+    const exact = COUNTRY_OPTIONS.find(c => c.toLowerCase() === raw || COUNTRY_ZH_NAMES[c] === raw);
+    const firstMatch = exact || COUNTRY_OPTIONS.find(c => c.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[c]||'').includes(raw));
+    if(firstMatch) addCountry(firstMatch);
+  } else if(e.key === 'Escape'){
+    closeCountryDropdown();
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('countryFieldWrap');
+  if(wrap && !wrap.contains(e.target)) closeCountryDropdown();
+});
+
+let leafletMap = null;
+let mapMarkersLayer = null;
+let mapRenderToken = 0;
+let countryHighlightLayer = null;
+let worldGeoJsonPromise = null;
+let latestEvaluatedCountries = [];
+let currentRuns = [];
+const geocodeCache = JSON.parse(localStorage.getItem('geocodeCache') || '{}');
+
+function getWebhookUrl(){ return localStorage.getItem('dashboardWebhookUrl'); }
+
+function getBaseWebhookUrl(){
+  const url = getWebhookUrl();
+  if(!url) return null;
+  return url.replace(/dashboard-data\/?(\?.*)?$/, '');
+}
+function getStartRunUrl(){ const base = getBaseWebhookUrl(); return base ? base + 'start-run' : null; }
+function getSendEmailsUrl(){ const base = getBaseWebhookUrl(); return base ? base + 'send-emails' : null; }
+function getConfirmSendUrl(){ const base = getBaseWebhookUrl(); return base ? base + 'confirm-send' : null; }
+function getStartCompaniesUrl(){ const base = getBaseWebhookUrl(); return base ? base + 'start-companies' : null; }
+function getReEvaluateUrl(){ const base = getBaseWebhookUrl(); return base ? base + 're-evaluate' : null; }
+function getUpdateStatusUrl(){ const base = getBaseWebhookUrl(); return base ? base + 'update-status' : null; }
+
+function showToast(message, type){
+  const existing = document.querySelector('.toast');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type ? ' ' + type : '');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 6000);
+}
+
+// 這家公司實際會被拿去寄信的Email：CEO窗口優先、沒有才用採購窗口，
+// 跟n8n「解析公司清單並組信件內容」節點選收件人的邏輯完全一致，
+// 確保儀表板上顯示/複製的Email，就是真正按下「寄信」後會送達的那一個。
+// 設定KPI卡片數字時用這個，不要直接改textContent：
+// 數字太長（例如「10 / 22」這種分數）會先維持預設字級，量測是否放得下，
+// 放不下就一格一格縮小字級，直到單行塞得進卡片寬度為止，卡片本身大小完全不受影響。
+function fitKpiValue(id, text){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = text;
+  el.style.fontSize = '';
+  let size = 28;
+  el.style.fontSize = size + 'px';
+  while(el.scrollWidth > el.clientWidth && size > 15){
+    size -= 1;
+    el.style.fontSize = size + 'px';
+  }
+}
+
+function sendToEmailFor(c){
+  return (c && (c.ceo_email || c.purchasing_email)) || '';
+}
+
+async function copyCompanyEmail(email, btnEl){
+  if(!email){ showToast('這家公司目前沒有找到可寄信的Email', 'error'); return; }
+  try{
+    await navigator.clipboard.writeText(email);
+    showToast('已複製：' + email, null);
+  }catch(e){
+    showToast('複製失敗，請手動複製：' + email, 'error');
+  }
+}
+
+function showJobStatus(message){
+  const bar = document.getElementById('jobStatusBar');
+  const text = document.getElementById('jobStatusText');
+  if(text) text.textContent = message;
+  if(bar) bar.classList.remove('hidden');
+}
+
+function hideJobStatus(){
+  const bar = document.getElementById('jobStatusBar');
+  if(bar) bar.classList.add('hidden');
+}
+
+// 記錄「目前正在等待完成的任務」。不用獨立的一條輪詢邏輯自己悶著頭檢查——
+// 而是不管資料是從哪裡刷新進來的（手動按重新整理、自動每90秒刷新、還是這裡自己排程的輪詢），
+// 只要成功拿到一次新資料，都會呼叫 checkActiveJobCompletion 順便檢查一次任務是否完成。
+// 這樣就不會有「畫面其實已經更新了，左下角狀態列卻不知道」這種兩條路各自為政的問題。
+let activeJob = null; // { kind, country, baselineTs, doneMessage, startedAt, maxWaitMs }
+let activeJobPoll = null;
+let activeJobTick = null;
+
+function checkActiveJobCompletion(data){
+  if(!activeJob) return;
+  const list = activeJob.kind === 'run' ? (data.countryList||[]) : (data.allCandidates||[]);
+  const done = list.some(c => countryEquals(c.country, activeJob.country) && c.timestamp && new Date(c.timestamp).getTime() > activeJob.baselineTs);
+  const timedOut = !done && (Date.now() - activeJob.startedAt > activeJob.maxWaitMs);
+  if(done || timedOut){
+    const msg = done ? activeJob.doneMessage : '已經等了一段時間，如果你確定n8n那邊已經跑完，可能是判斷邏輯沒抓到，直接按重新整理確認結果就好';
+    stopJobTracking();
+    showJobStatus(msg);
+    setTimeout(hideJobStatus, 2500);
+  } else {
+    // 還沒偵測到完成，更新一下已經等了多久，至少讓你知道它還在動、不是卡死
+    const secs = Math.round((Date.now() - activeJob.startedAt) / 1000);
+    showJobStatus('正在' + (activeJob.kind === 'run' ? '跑「' + activeJob.country + '」的國家背景' : '抓取「' + activeJob.country + '」的候選公司') + '，已等待 ' + secs + ' 秒...');
+  }
+}
+
+function stopJobTracking(){
+  activeJob = null;
+  if(activeJobPoll){ clearInterval(activeJobPoll); activeJobPoll = null; }
+  if(activeJobTick){ clearInterval(activeJobTick); activeJobTick = null; }
+}
+
+// 開始追蹤一個任務：每10秒呼叫一次 loadData() 刷新資料，刷新完 loadData 自己就會去檢查是否完成，
+// 不需要另外寫一套獨立的fetch邏輯。
+// 判斷「有沒有新資料」的基準點，改成「目前已知這個國家最新一筆資料的時間戳記」，
+// 不用瀏覽器的系統時間——因為瀏覽器時鐘跟n8n/Notion伺服器的時鐘不一定對得齊，
+// 用系統時間當基準，有可能明明新資料已經寫進去了，比較邏輯卻因為時差而判斷錯誤。
+function startJobTracking(kind, country, doneMessage, maxWaitMs){
+  let baselineTs = 0;
+  try {
+    const list = kind === 'run' ? ((currentData && currentData.countryList) || []) : ((currentData && currentData.allCandidates) || []);
+    list.forEach(c => {
+      if(countryEquals(c.country, country) && c.timestamp){
+        const t = new Date(c.timestamp).getTime();
+        if(Number.isFinite(t) && t > baselineTs) baselineTs = t;
+      }
+    });
+  } catch(e) { baselineTs = 0; }
+  activeJob = { kind, country, doneMessage, baselineTs, startedAt: Date.now(), maxWaitMs };
+  if(activeJobPoll) clearInterval(activeJobPoll);
+  if(activeJobTick) clearInterval(activeJobTick);
+  activeJobPoll = setInterval(() => { loadData(); }, 10000);
+  // 每秒更新一次已等待秒數的顯示，跟上面10秒一次的實際資料輪詢分開，純粹讓畫面看起來有在跑
+  activeJobTick = setInterval(() => {
+    if(!activeJob) return;
+    const secs = Math.round((Date.now() - activeJob.startedAt) / 1000);
+    const text = document.getElementById('jobStatusText');
+    if(text && !document.getElementById('jobStatusBar').classList.contains('hidden')){
+      text.textContent = '正在' + (activeJob.kind === 'run' ? '跑「' + activeJob.country + '」的國家背景' : '抓取「' + activeJob.country + '」的候選公司') + '，已等待 ' + secs + ' 秒...';
+    }
+  }, 1000);
+}
+
+// 國家背景調查是「這個國家值不值得投資」的市場層級判斷，不應該因為這次打Hair Care還是
+// Skincare就得到不同的評分——同一個國家的法規/ESG/GDP資訊不會因為產品線不同而改變，
+// 用單一品項重複查只會浪費AI額度、還可能讓同一國家跑出自相矛盾的評分。
+// 所以這裡固定用一段涵蓋歐萊德全品項的描述，不吃「商品種類」欄位的值(那個欄位專門給②企業搜尋與篩選用)。
+// 注意：這段字會被塞進Tavily搜尋的query參數，Tavily對query有400字元硬上限，
+// 所以這裡刻意寫得精簡(不是產品介紹文案)，太長會導致Tavily直接回400 Bad Request。
+const ORIGHT_FULL_PRODUCT_RANGE = 'natural & organic hair care, facial care, body care, and home living products';
+
+async function startRun(){
+  const url = getStartRunUrl();
+  if(!url){ showToast('找不到啟動網址，請確認已連接n8n Webhook', 'error'); return; }
+  const countries = document.getElementById('inputCountries').value.trim();
+  if(!countries){ showToast('請填寫國家', 'error'); return; }
+  showJobStatus('正在跑「' + countries + '」的國家背景，請稍後...');
+  try{
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ countries, product_attribute: ORIGHT_FULL_PRODUCT_RANGE })
+    });
+    startJobTracking('run', countries, '已完成，準備重新整理頁面...', 6 * 60 * 1000);
+  }catch(err){
+    hideJobStatus();
+    showToast('送出失敗：' + err.message, 'error');
+  }
+}
+
+async function startCompanies(){
+  const url = getStartCompaniesUrl();
+  if(!url){ showToast('找不到抓公司網址，請確認已連接n8n Webhook', 'error'); return; }
+  const countries = document.getElementById('inputCountries').value.trim();
+  const productAttr = document.getElementById('inputProductAttr').value.trim();
+  if(!countries || !productAttr){ showToast('請填寫國家跟商品種類', 'error'); return; }
+  showJobStatus('正在抓取「' + countries + '」的候選公司，請稍後...');
+  try{
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ countries, product_attribute: productAttr, mode: 'companies' })
+    });
+    startJobTracking('companies', countries, '已完成，準備重新整理頁面...', 12 * 60 * 1000);
+  }catch(err){
+    hideJobStatus();
+    showToast('送出失敗：' + err.message, 'error');
+  }
+}
+
+async function sendGradeEmails(grade){
+  // 審核機制開啟 → 先跳「選公司」視窗,挑選後逐封審核
+  if(reviewModeOn){
+    const list = (currentAllCandidates||[]).filter(c => c.grade === grade);
+    if(!list.length){ showToast('目前沒有等級 ' + grade + ' 的公司', 'error'); return; }
+    openGradeReviewModal('等級 ' + grade + ' 公司', list);
+    return;
+  }
+  // 審核機制關閉 → 維持原本直接批次寄出
+  const url = getSendEmailsUrl();
+  if(!url){ showToast('找不到寄信網址，請確認已連接n8n Webhook', 'error'); return; }
+  const confirmed = confirm('確定要寄信給所有等級 ' + grade + ' 且PASS的公司聯絡窗口嗎？這會實際寄出開發信給這些公司。');
+  if(!confirmed) return;
+  showToast('寄信中，請稍候...', null);
+  try{
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ mode:'grade', grade }) });
+    const data = await res.json();
+    showToast('已寄出 ' + (data.sent_count ?? 0) + ' 封信' + (data.failed_count ? '，失敗 ' + data.failed_count + ' 封' : ''), 'success');
+  }catch(err){ showToast('寄信失敗：' + err.message, 'error'); }
+}
+
+async function sendTop5Digest(){
+  // 審核機制開啟 → 取總分前5名,跳選公司視窗逐封審核
+  if(reviewModeOn){
+    const top5 = [...(currentAllCandidates||[])].sort((a,b)=>(b.total_score||0)-(a.total_score||0)).slice(0,5);
+    if(!top5.length){ showToast('目前沒有公司可審核', 'error'); return; }
+    openGradeReviewModal('Top5 總分公司', top5);
+    return;
+  }
+  // 審核機制關閉 → 維持原本:整批草稿寄給自己
+  const url = getSendEmailsUrl();
+  if(!url){ showToast('找不到寄信網址，請確認已連接n8n Webhook', 'error'); return; }
+  let selfEmail = localStorage.getItem('selfEmail');
+  if(!selfEmail){ selfEmail = prompt('第一次使用，請輸入你自己的信箱（會記住）：'); if(!selfEmail) return; localStorage.setItem('selfEmail', selfEmail); }
+  showToast('整理草稿中，請稍候...', null);
+  try{
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ mode:'top5', self_email:selfEmail }) });
+    await res.json();
+    showToast('Top5草稿已寄到 ' + selfEmail, 'success');
+  }catch(err){ showToast('寄送失敗：' + err.message, 'error'); }
+}
+
+function testInNewTab(){
+  const val = document.getElementById('webhookInput').value.trim();
+  if(!val){ alert('請先貼上網址'); return; }
+  window.open(val, '_blank');
+}
+
+function saveWebhook(){
+  const val = document.getElementById('webhookInput').value.trim();
+  if(!val){ return; }
+  localStorage.setItem('dashboardWebhookUrl', val);
+  showDashboard();
+}
+
+function resetWebhook(){
+  localStorage.removeItem('dashboardWebhookUrl');
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('setupScreen').classList.remove('hidden');
+}
+
+function showDashboard(){
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  renderGradeFilterButtons();
+  loadData();
+}
+
+let currentAllCandidates = [];
+let currentEmailLog = [];
+let currentContactFilter = 'ALL';
+let contactSortField = null;   // null(預設，依總分排序) 或 'status'
+let contactSortDir = 'asc';
+
+function updateContactSortIcons(){
+  const icon = document.getElementById('sortIconContactStatus');
+  if(!icon) return;
+  icon.textContent = contactSortField === 'status' ? (contactSortDir === 'desc' ? '▼' : '▲') : '↕';
+  icon.classList.toggle('active', contactSortField === 'status');
+}
+
+function toggleContactSort(field){
+  if(contactSortField === field){
+    contactSortDir = contactSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    contactSortField = field;
+    contactSortDir = 'asc';
+  }
+  contactPage = 0;
+  renderContactCenter();
+}
+let expandedHistoryCompany = null;
+const CONTACT_STATUSES = ['未聯繫','已寄信','已寄草稿','已回覆待確認','待跟進','寄送失敗'];
+const GRADE_COLORS = { S:'var(--grade-s)', A:'var(--grade-a)', B:'var(--grade-b)', C:'var(--grade-c)', D:'var(--grade-d)' };
+
+function renderGradeFilterButtons(){
+  const row = document.getElementById('gradeFilterRow');
+  row.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'btn-grade-filter';
+  allBtn.style.background = 'var(--panel-2)';
+  allBtn.style.color = 'var(--text-heading)';
+  allBtn.style.fontWeight = '600';
+  allBtn.textContent = '公司總覽';
+  allBtn.onclick = () => applyFilter('all', 'ALL', allBtn);
+  row.appendChild(allBtn);
+  ['S','A','B','C','D'].forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-grade-filter';
+    btn.style.background = gradeColorBg(g);
+    btn.style.color = GRADE_COLORS[g];
+    btn.textContent = g + '級';
+    btn.onclick = () => applyFilter('grade', g, btn);
+    row.appendChild(btn);
+  });
+  const p1Btn = document.createElement('button');
+  p1Btn.className = 'btn-grade-filter';
+  p1Btn.style.background = 'var(--grade-d-dim)';
+  p1Btn.style.color = 'var(--grade-d)';
+  p1Btn.style.marginLeft = '8px';
+  p1Btn.style.borderLeft = '2px solid var(--border)';
+  p1Btn.style.paddingLeft = '16px';
+  p1Btn.textContent = 'P1最優先';
+  p1Btn.onclick = () => applyFilter('priority', 'P1', p1Btn);
+  row.appendChild(p1Btn);
+}
+
+let currentFilterType = 'grade';   // 'grade' 或 'priority'
+let currentFilterGrade = null;
+let sortField = 'score';   // 'score' 或 'category'
+let sortDir = 'desc';      // 'asc' 或 'desc'
+let gradePage = 0;
+
+function updateSortIcons(){
+  const iconScore = document.getElementById('sortIconScore');
+  const iconCategory = document.getElementById('sortIconCategory');
+  iconScore.textContent = sortField === 'score' ? (sortDir === 'desc' ? '▼' : '▲') : '↕';
+  iconCategory.textContent = sortField === 'category' ? (sortDir === 'desc' ? '▼' : '▲') : '↕';
+  iconScore.classList.toggle('active', sortField === 'score');
+  iconCategory.classList.toggle('active', sortField === 'category');
+}
+
+function toggleSort(field){
+  if(sortField === field){
+    sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    sortField = field;
+    sortDir = field === 'score' ? 'desc' : 'asc';
+  }
+  gradePage = 0;
+  renderGradeTable();
+}
+
+function applyFilter(type, value, btnEl){
+  document.querySelectorAll('.btn-grade-filter').forEach(b => b.classList.remove('active'));
+  if(btnEl) btnEl.classList.add('active');
+  currentFilterType = type;
+  currentFilterGrade = value;
+  gradePage = 0;
+  renderGradeTable();
+}
+
+// 保留舊名稱，讓render()裡重新套用篩選時的呼叫不會壞掉
+function filterByGrade(grade, btnEl){
+  applyFilter('grade', grade, btnEl);
+}
+
+function renderGradeTable(){
+  updateSortIcons();
+  if(!currentFilterGrade){
+    document.getElementById('gradeBrowseEmpty').classList.remove('hidden');
+    document.getElementById('gradeBrowseEmpty').textContent = '請點上方按鈕，顯示該等級或P1最優先的公司清單。';
+    document.getElementById('gradeBrowseBody').innerHTML = '';
+    const pg = document.getElementById('gradeBrowsePager'); if(pg) pg.innerHTML = '';
+    return;
+  }
+
+  let filtered = currentFilterType === 'all'
+    ? [...currentAllCandidates]
+    : currentFilterType === 'priority'
+      ? currentAllCandidates.filter(c => c.priority === currentFilterGrade)
+      : currentAllCandidates.filter(c => c.grade === currentFilterGrade);
+  const tbody = document.getElementById('gradeBrowseBody');
+  tbody.innerHTML = '';
+  document.getElementById('gradeBrowseEmpty').classList.toggle('hidden', filtered.length > 0);
+  if(filtered.length === 0){
+    document.getElementById('gradeBrowseEmpty').textContent = currentFilterType === 'priority' ? '目前沒有P1最優先的公司。' : (currentFilterType === 'all' ? '目前還沒有公司資料。' : '這個等級目前沒有公司。');
+  }
+
+  filtered.sort((a, b) => {
+    let cmp;
+    if(sortField === 'score'){
+      cmp = (a.total_score ?? 0) - (b.total_score ?? 0);
+    } else {
+      cmp = String(a.category || '').localeCompare(String(b.category || ''));
+    }
+    return sortDir === 'desc' ? -cmp : cmp;
+  });
+
+  const total = filtered.length;
+  const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+  if(gradePage > maxPage) gradePage = maxPage;
+  const start = gradePage * PAGE_SIZE;
+  filtered.slice(start, start + PAGE_SIZE).forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="company-name">${escapeHtml(c.company_name || '')}</div>
+        <div class="company-site">${escapeHtml(c.website || '')} · <span class="company-country">${escapeHtml(countryDisplayName(c.country) || '')}</span></div>
+        <div class="company-site" style="margin-top:2px;">爬取日期：${c.timestamp ? new Date(c.timestamp).toLocaleDateString('zh-TW') : '—'}</div>
+        ${contactStatusBadge(c.contact_status)}
+      </td>
+      <td><span class="score-pill" style="background:${gradeColorBg(c.grade)}; color:${gradeColorFg(c.grade)};">${escapeHtml(c.grade || '-')}</span></td>
+      <td>${c.total_score ?? 0}</td>
+      <td style="color:var(--text-dim);">${escapeHtml(c.category || '')}</td>
+      <td style="color:var(--text-dim); max-width:260px;">${escapeHtml(c.strengths || '')}</td>
+      <td style="color:var(--text-dim); max-width:260px;">${escapeHtml(c.risks || '')}</td>
+      <td style="color:var(--text-dim); max-width:200px;">${(() => {
+        const parts = recommendedActionParts(c.recommended_action);
+        if(!parts.type) return '';
+        return parts.detail
+          ? `<span class="action-type-tip" data-tip="${escapeHtml(parts.detail)}">${escapeHtml(parts.type)}</span>`
+          : escapeHtml(parts.type);
+      })()}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  renderPager('gradeBrowsePager', total, gradePage, p => { gradePage = p; renderGradeTable(); });
+}
+
+function renderAllCompanies(){ /* 已併入公司清單，保留空函式避免舊呼叫報錯 */ }
+
+// ===== 信件管理中心 =====
+
+function latestEmailForCompany(companyName){
+  if(!companyName) return null;
+  for(const e of currentEmailLog){
+    if(e.company_name === companyName) return e;
+  }
+  return null;
+}
+
+function historyForCompany(companyName){
+  return currentEmailLog.filter(e => e.company_name === companyName);
+}
+
+function contactStatusColor(status){
+  const map = {
+    '未聯繫': { bg:'var(--panel-2)', fg:'var(--text-dim)' },
+    '已寄信': { bg:'var(--grade-b-dim)', fg:'var(--grade-b)' },
+    '已寄草稿': { bg:'#FAF1DC', fg:'var(--grade-c)' },
+    '已回覆待確認': { bg:'var(--grade-a-dim)', fg:'var(--grade-a)' },
+    '待跟進': { bg:'#FAF1DC', fg:'var(--grade-c)' },
+    '寄送失敗': { bg:'var(--grade-d-dim)', fg:'var(--grade-d)' }
+  };
+  return map[status] || { bg:'var(--panel-2)', fg:'var(--text-dim)' };
+}
+
+function formatTimeShort(ts){
+  if(!ts) return '';
+  try{ return new Date(ts).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }); }
+  catch(e){ return ts; }
+}
+
+function renderContactFilterButtons(){
+  const row = document.getElementById('contactFilterRow');
+  row.innerHTML = '';
+  const counts = { ALL: currentAllCandidates.length };
+  CONTACT_STATUSES.forEach(s => { counts[s] = currentAllCandidates.filter(c => (c.contact_status || '未聯繫') === s).length; });
+  // 「已回覆待確認」代表對方確實回信了，前提一定是信已經寄出去，所以顯示的數字上，
+  // 「已寄信」這個按鈕要把「已回覆待確認」的家數也算進去，不然數字看起來會漏算。
+  // 但點下去篩選時，各按鈕還是各自只顯示自己精確的狀態，方便你分別檢視。
+  counts['已寄信'] = (counts['已寄信'] || 0) + (counts['已回覆待確認'] || 0);
+
+  const makeBtn = (value, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-status-filter' + (currentContactFilter === value ? ' active' : '');
+    btn.innerHTML = escapeHtml(label) + '<span class="count">' + (counts[value] ?? 0) + '</span>';
+    btn.onclick = () => { currentContactFilter = value; contactPage = 0; renderContactFilterButtons(); renderContactCenter(); };
+    return btn;
+  };
+
+  row.appendChild(makeBtn('ALL', '全部'));
+  CONTACT_STATUSES.forEach(s => row.appendChild(makeBtn(s, s)));
+}
+
+let contactCenterCurrentList = [];
+const PAGE_SIZE = 10;
+const COUNTRY_BRIEF_PAGE_SIZE = 6;
+let currentWorklog = [];
+let worklogPage = 0;
+let contactPage = 0;
+
+// 通用分頁列
+function renderPager(containerId, total, page, onGo, pageSize){
+  pageSize = pageSize || PAGE_SIZE;
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = '';
+  if(total <= pageSize) return;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const mk = (label, target, disabled) => {
+    const b = document.createElement('button');
+    b.className = 'pager-btn';
+    b.textContent = label;
+    b.disabled = disabled;
+    if(!disabled) b.onclick = () => onGo(target);
+    return b;
+  };
+  el.appendChild(mk('‹ 上一頁', page - 1, page <= 0));
+  const info = document.createElement('span');
+  info.className = 'pager-info';
+  info.textContent = `第 ${page + 1} / ${pages} 頁（共 ${total} 筆）`;
+  el.appendChild(info);
+  el.appendChild(mk('下一頁 ›', page + 1, page >= pages - 1));
+}
+
+function closeCountryBriefDropdown(){
+  const dd = document.getElementById('countryBriefDropdown');
+  if(!dd) return;
+  dd.classList.add('hidden');
+  dd.innerHTML = '';
+}
+
+function toggleCountryBriefSearchDropdown(e){
+  if(e) e.stopPropagation();
+  const dd = document.getElementById('countryBriefDropdown');
+  if(dd && !dd.classList.contains('hidden')){
+    closeCountryBriefDropdown();
+  } else {
+    document.getElementById('countryBriefSearchInput').focus();
+  }
+}
+
+// 這個搜尋框只列「已經有做過國家投資簡介」的國家（currentCountryListData），
+// 不是像側邊欄那樣列出全世界44個國家——因為這裡的用途是「快速跳到某個國家的簡介卡片」，
+// 沒做過簡介的國家在這裡列出來也點不出東西。
+function onCountryBriefSearchInput(forceShowAll){
+  const raw = forceShowAll ? '' : document.getElementById('countryBriefSearchInput').value.trim().toLowerCase();
+  const dd = document.getElementById('countryBriefDropdown');
+  const uniqueNames = [...new Set(currentCountryListData.map(c => c.country).filter(Boolean))];
+  const matches = raw ? uniqueNames.filter(n => n.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[n]||'').includes(raw)) : uniqueNames;
+  dd.innerHTML = '';
+  if(matches.length === 0){
+    dd.innerHTML = '<div class="country-dropdown-empty">找不到已建立簡介的國家</div>';
+  } else {
+    matches.slice(0, 30).forEach(name => {
+      const opt = document.createElement('div');
+      opt.className = 'country-option';
+      opt.textContent = countryDisplayName(name);
+      opt.onclick = () => jumpToCountryBrief(name);
+      dd.appendChild(opt);
+    });
+  }
+  dd.classList.remove('hidden');
+}
+
+function onCountryBriefSearchKeydown(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    const raw = document.getElementById('countryBriefSearchInput').value.trim().toLowerCase();
+    if(!raw) return;
+    const uniqueNames = [...new Set(currentCountryListData.map(c => c.country).filter(Boolean))];
+    const exact = uniqueNames.find(n => n.toLowerCase() === raw || COUNTRY_ZH_NAMES[n] === raw);
+    const firstMatch = exact || uniqueNames.find(n => n.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[n]||'').includes(raw));
+    if(firstMatch) jumpToCountryBrief(firstMatch);
+  } else if(e.key === 'Escape'){
+    closeCountryBriefDropdown();
+  }
+}
+
+// 跳到指定國家的卡片：算出它在第幾頁、自動展開它、換頁後平滑捲動過去
+function jumpToCountryBrief(name){
+  const idx = currentCountryListData.findIndex(c => c.country === name);
+  if(idx === -1) return;
+  countryBriefPage = Math.floor(idx / COUNTRY_BRIEF_PAGE_SIZE);
+  expandedCountries.add(name);
+  const input = document.getElementById('countryBriefSearchInput');
+  if(input) input.value = countryDisplayName(name);
+  closeCountryBriefDropdown();
+  renderCountryBrief();
+  setTimeout(() => {
+    const slug = 'country-' + String(name).replace(/[^a-zA-Z0-9]/g, '_');
+    const el = document.getElementById(slug);
+    if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('countryBriefSearchWrap');
+  if(wrap && !wrap.contains(e.target)) closeCountryBriefDropdown();
+});
+
+// 點一下國家那一條，展開/收合詳細內容（市場摘要、近期新聞、GDP）
+function toggleCountryCard(name){
+  if(expandedCountries.has(name)) expandedCountries.delete(name);
+  else expandedCountries.add(name);
+  renderCountryBrief();
+}
+
+// 國家投資簡介：預設每個國家只顯示一小條（國家名稱＋最後更新日期＋分數），點了才展開詳細內容，
+// 一頁最多顯示7個國家，避免「全部國家」視圖時，展開全部細節塞爆整個畫面。
+function renderCountryBrief(){
+  const countries = currentCountryListData;
+  const isSingleCountryView = selectedCountry !== '__ALL__';
+  const briefEl = document.getElementById('countryBrief');
+  briefEl.innerHTML = '';
+  document.getElementById('countryBriefEmpty').classList.toggle('hidden', countries.length > 0);
+  // 選單一國家時，畫面上就只會有這一筆資料，搜尋框沒有意義，直接隱藏。
+  const searchWrap = document.getElementById('countryBriefSearchWrap');
+  if(searchWrap) searchWrap.classList.toggle('hidden', isSingleCountryView);
+  countryCards = [];
+
+  const maxPage = Math.max(0, Math.ceil(countries.length / COUNTRY_BRIEF_PAGE_SIZE) - 1);
+  if(countryBriefPage > maxPage) countryBriefPage = maxPage;
+  const start = countryBriefPage * COUNTRY_BRIEF_PAGE_SIZE;
+  const pageItems = countries.slice(start, start + COUNTRY_BRIEF_PAGE_SIZE);
+
+  pageItems.forEach(c => {
+    const slug = 'country-' + String(c.country || '').replace(/[^a-zA-Z0-9]/g, '_');
+    // 選單一國家時（只會有這一筆），直接完整展開，不需要再點一下才看得到內容；
+    // 只有在「全部國家」這種一次列很多國家的視圖，才需要收合／展開的機制。
+    const isOpen = isSingleCountryView ? true : expandedCountries.has(c.country);
+    const updatedShort = c.timestamp ? new Date(c.timestamp).toLocaleString('zh-TW', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    const card = document.createElement('div');
+    card.className = 'country-card' + (isOpen ? ' expanded' : '');
+    card.id = slug;
+    card.innerHTML = `
+      <div class="country-card-top"${isSingleCountryView ? '' : ' style="cursor:pointer;"'}>
+        <span class="country-name">${escapeHtml(countryDisplayName(c.country) || '')}${updatedShort ? `<span class="country-updated-mini">更新於 ${escapeHtml(updatedShort)}</span>` : ''}${isSingleCountryView ? '' : `<span class="expand-caret">${isOpen ? '▾' : '▸'}</span>`}</span>
+        <span>
+          <span class="reason-tip" data-tip="${escapeHtml(c.reason || '尚無評分')}">評分理由</span>
+          <span class="country-score" style="color:${scoreColor(c.investment_score||0)};">${c.investment_score ?? 0}<span style="font-size:11px; color:var(--text-faint);">/100</span></span>
+        </span>
+      </div>
+      <div class="country-card-detail"${isOpen ? '' : ' style="display:none;"'}>
+        <div style="font-size:11px; color:var(--text-faint); margin:0 0 6px;">最後更新：${c.timestamp ? new Date(c.timestamp).toLocaleString('zh-TW') : '—'}</div>
+        ${c.esg_summary ? `<div class="brief-box"><div class="brief-label">法規／ESG（市場摘要）</div><div class="country-reason">${escapeHtml(c.esg_summary)}</div></div>` : ''}
+        ${c.news_summary ? `<div class="brief-box"><div class="brief-label">近期新聞</div><div class="country-reason">${escapeHtml(c.news_summary)}</div></div>` : ''}
+        ${c.gdp_info ? `<div class="brief-box"><div class="brief-label">GDP（人均／總額，較前一年）</div><div class="country-reason" style="white-space:pre-line;">${escapeHtml(c.gdp_info)}</div></div>` : (c.gdp_per_capita_usd != null ? `<div class="brief-box"><div class="brief-label">人均GDP</div><div class="country-reason">${formatGdpPerCapita(c.gdp_per_capita_usd, c.gdp_year)}</div></div>` : '')}
+      </div>
+    `;
+    briefEl.appendChild(card);
+
+    // 用JS綁定click（不用inline onclick字串拼接），避免國家名稱裡萬一有特殊字元（例如評分失敗標記）
+    // 導致onclick屬性被破壞；同時讓「評分理由」的hover提示點擊時不會一併觸發展開/收合。
+    if(!isSingleCountryView){
+      const topRow = card.querySelector('.country-card-top');
+      topRow.addEventListener('click', () => toggleCountryCard(c.country));
+    }
+    const tip = card.querySelector('.reason-tip');
+    if(tip) tip.addEventListener('click', (e) => e.stopPropagation());
+
+    if(c.country){ countryCards.push({ name: c.country, el: card }); }
+  });
+  updateCurrentCountry();
+  renderPager('countryBriefPager', countries.length, countryBriefPage, p => { countryBriefPage = p; renderCountryBrief(); }, COUNTRY_BRIEF_PAGE_SIZE);
+}
+
+function renderWorklog(){
+  const body = document.getElementById('worklogBody');
+  body.innerHTML = '';
+  const total = currentWorklog.length;
+  document.getElementById('worklogEmpty').classList.toggle('hidden', total > 0);
+  const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+  if(worklogPage > maxPage) worklogPage = maxPage;
+  const start = worklogPage * PAGE_SIZE;
+  currentWorklog.slice(start, start + PAGE_SIZE).forEach(w => {
+    const colors = sourceColor(w.source);
+    const tr = document.createElement('tr');
+    const timeStr = w.timestamp ? new Date(w.timestamp).toLocaleString('zh-TW') : '';
+    tr.innerHTML = `
+      <td><span class="score-pill" style="background:${colors.bg}; color:${colors.fg};">${escapeHtml(w.source || '')}</span></td>
+      <td>${escapeHtml(w.target || '')}</td>
+      <td>${w.resultCount ?? 0}</td>
+      <td style="color:var(--text-dim); max-width:220px;">${escapeHtml(w.summary || '')}</td>
+      <td style="color:var(--text-faint); font-size:11px; white-space:nowrap;">${escapeHtml(timeStr)}</td>
+    `;
+    body.appendChild(tr);
+  });
+  renderPager('worklogPager', total, worklogPage, p => { worklogPage = p; renderWorklog(); });
+}
+
+function renderContactCenter(){
+  updateContactSortIcons();
+  const tbody = document.getElementById('contactCenterBody');
+  tbody.innerHTML = '';
+
+  let list = [...currentAllCandidates];
+  if(currentContactFilter !== 'ALL'){
+    list = list.filter(c => (c.contact_status || '未聯繫') === currentContactFilter);
+  }
+  if(contactSortField === 'status'){
+    // 依 CONTACT_STATUSES 定義的順序分類排列(未聯繫→已寄信→已寄草稿→已回覆待確認→待跟進→寄送失敗)，
+    // 而不是單純照字母排序，這樣同一種聯繫狀態的公司才會排在一起、且順序符合邏輯上的流程先後。
+    list.sort((a, b) => {
+      const ia = CONTACT_STATUSES.indexOf(a.contact_status || '未聯繫');
+      const ib = CONTACT_STATUSES.indexOf(b.contact_status || '未聯繫');
+      const cmp = ia - ib;
+      return contactSortDir === 'desc' ? -cmp : cmp;
+    });
+  } else {
+    list.sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0));
+  }
+  contactCenterCurrentList = list;
+
+  document.getElementById('contactCenterEmpty').classList.toggle('hidden', list.length > 0);
+
+  const total = list.length;
+  const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+  if(contactPage > maxPage) contactPage = maxPage;
+  const start = contactPage * PAGE_SIZE;
+  list.slice(start, start + PAGE_SIZE).forEach((c, i) => {
+    const idx = start + i;
+    const latest = latestEmailForCompany(c.company_name);
+    const status = c.contact_status || '未聯繫';
+    const colors = contactStatusColor(status);
+    const history = historyForCompany(c.company_name);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="company-name">${escapeHtml(c.company_name || '')}</div>
+        <div class="company-site">${escapeHtml(c.website || '')} · <span class="company-country">${escapeHtml(countryDisplayName(c.country) || '')}</span></div>
+      </td>
+      <td style="color:var(--text-dim);">${escapeHtml(c.category || '')}</td>
+      <td><span class="score-pill" style="background:${gradeColorBg(c.grade)}; color:${gradeColorFg(c.grade)};">${escapeHtml(c.grade || '-')}</span> ${c.total_score ?? 0}</td>
+      <td>
+        <select class="status-select" data-prev-value="${escapeHtml(status)}" style="background:${colors.bg}; color:${colors.fg};" onchange="updateContactStatus('${c.id}', this.value, this)">
+          ${CONTACT_STATUSES.map(s => `<option value="${escapeHtml(s)}" ${s === status ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+        </select>
+      </td>
+      <td style="color:var(--text-dim); font-size:12px; white-space:nowrap;">${escapeHtml(formatTimeShort(latest ? latest.timestamp : c.last_contacted_at))}</td>
+      <td style="color:var(--text-dim); max-width:220px;">
+        ${escapeHtml(latest ? latest.subject : '')}
+        ${history.length > 0 ? `<button class="btn-link" onclick="toggleEmailHistory(${idx})">${expandedHistoryCompany === c.company_name ? '收合' : '查看歷史(' + history.length + ')'}</button>` : ''}
+      </td>
+      <td style="text-align:right; width:175px; max-width:175px; white-space:nowrap;">
+        <span class="copy-email-btn" data-tip="${escapeHtml(sendToEmailFor(c)) || '沒有找到可寄信的Email'}" onclick="copyCompanyEmail('${escapeHtml(sendToEmailFor(c))}', this)">複製</span>
+        <button class="btn-row-action send" onclick="sendSingleAction('${c.id}', 'send', this)">寄信</button>
+        <button class="btn-row-action" onclick="sendSingleAction('${c.id}', 'draft', this)">草稿</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+
+    if(expandedHistoryCompany === c.company_name && history.length > 0){
+      const historyTr = document.createElement('tr');
+      historyTr.className = 'email-history-row';
+      const itemsHtml = history.map(h => {
+        const hc = contactStatusColor(h.status === '失敗' ? '寄送失敗' : (h.is_draft ? '已寄草稿' : '已寄信'));
+        return `<div class="email-history-item">
+          <span class="eh-time">${escapeHtml(formatTimeShort(h.timestamp))}</span>
+          <span class="eh-status" style="background:${hc.bg}; color:${hc.fg};">${escapeHtml(h.status || '')}${h.is_draft ? '（草稿）' : ''}</span>
+          <span class="eh-subject">${escapeHtml(h.subject || '')} → ${escapeHtml(h.to || '')}</span>
+        </div>`;
+      }).join('');
+      historyTr.innerHTML = `<td colspan="6">${itemsHtml}</td>`;
+      tbody.appendChild(historyTr);
+    }
+  });
+  renderPager('contactPager', total, contactPage, p => { contactPage = p; renderContactCenter(); });
+}
+
+function toggleEmailHistory(idx){
+  const c = contactCenterCurrentList[idx];
+  if(!c) return;
+  expandedHistoryCompany = (expandedHistoryCompany === c.company_name) ? null : c.company_name;
+  renderContactCenter();
+}
+
+// 手動更改聯繫狀態：呼叫n8n的 update-status webhook，寫回Notion的「聯繫狀態」欄位，
+// 讓你可以自己標記「已回覆待確認」「待跟進」等狀態，不用完全依賴自動化(寄信/收信IMAP/逾時排程)才能改狀態。
+async function updateContactStatus(companyId, newStatus, selectEl){
+  const url = getUpdateStatusUrl();
+  if(!url){ showToast('找不到更新狀態的網址，請確認已連接n8n Webhook', 'error'); return; }
+  const prevValue = selectEl.getAttribute('data-prev-value') || '';
+  selectEl.disabled = true;
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'update_status', company_id: companyId, new_status: newStatus })
+    });
+    let data = {};
+    try { data = await res.json(); } catch(e) { data = {}; }
+    if(res.ok && data.success !== false){
+      showToast('聯繫狀態已更新為「' + newStatus + '」', 'success');
+      // 直接更新本地資料，畫面立刻反應，不用等下一次自動輪詢重抓
+      const c = currentAllCandidates.find(x => x.id === companyId);
+      if(c) c.contact_status = newStatus;
+      const colors = contactStatusColor(newStatus);
+      selectEl.style.background = colors.bg;
+      selectEl.style.color = colors.fg;
+      selectEl.setAttribute('data-prev-value', newStatus);
+    } else {
+      showToast('更新失敗，請稍後再試', 'error');
+      selectEl.value = prevValue;
+    }
+  } catch(e){
+    showToast('更新失敗：' + e.message, 'error');
+    selectEl.value = prevValue;
+  } finally {
+    selectEl.disabled = false;
+  }
+}
+
+
+// ===== 重新評估既有公司:選範圍視窗 + 觸發 =====
+// 這個視窗不用再另外選一次國家——直接沿用「選擇國家」目前選的範圍(全球總覽或單一國家)，
+// 你只要選「全部」還是「個別挑選」即可。
+
+function openReEvaluateModal(){
+  const label = document.getElementById('reEvalScopeLabel');
+  if(label) label.textContent = selectedCountry === '__ALL__' ? '全球總覽（所有國家）' : countryDisplayName(selectedCountry);
+  document.getElementById('reEvalMode').value = 'all';
+  document.getElementById('reEvalCompanyListWrap').style.display = 'none';
+  document.getElementById('reEvaluateModal').classList.remove('hidden');
+}
+function closeReEvaluateModal(){ document.getElementById('reEvaluateModal').classList.add('hidden'); }
+
+function onReEvalModeChange(){
+  const mode = document.getElementById('reEvalMode').value;
+  document.getElementById('reEvalCompanyListWrap').style.display = (mode === 'companies') ? '' : 'none';
+  if(mode === 'companies') renderReEvalCompanyList();
+}
+
+// 目前範圍是全球總覽就列出全部候選公司，是單一國家就只列該國的
+function renderReEvalCompanyList(){
+  const listEl = document.getElementById('reEvalCompanyList');
+  listEl.innerHTML = '';
+  const companies = selectedCountry === '__ALL__'
+    ? currentAllCandidates
+    : currentAllCandidates.filter(c => countryEquals(c.country, selectedCountry));
+  if(companies.length === 0){
+    listEl.innerHTML = '<div class="country-dropdown-empty">目前範圍內沒有候選公司</div>';
+    return;
+  }
+  companies.forEach(c => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); cursor:pointer; padding:4px 0;';
+    row.innerHTML = `<input type="checkbox" class="reeval-company-cb" value="${escapeHtml(c.id)}" checked style="width:14px; height:14px;"> ${escapeHtml(c.company_name || '')} <span style="color:var(--text-faint); font-size:11px;">(${escapeHtml(countryDisplayName(c.country) || '')} · ${escapeHtml(c.grade || '-')})</span>`;
+    listEl.appendChild(row);
+  });
+  document.getElementById('reEvalSelectAll').checked = true;
+}
+function toggleAllReEvalCompanies(){
+  const checked = document.getElementById('reEvalSelectAll').checked;
+  document.querySelectorAll('.reeval-company-cb').forEach(cb => { cb.checked = checked; });
+}
+
+async function startReEvaluate(){
+  const url = getReEvaluateUrl();
+  if(!url){ showToast('找不到重新評估網址，請確認已連接n8n Webhook', 'error'); return; }
+  const mode = document.getElementById('reEvalMode').value;
+  let payload;
+  if(mode === 'companies'){
+    const ids = [...document.querySelectorAll('.reeval-company-cb:checked')].map(cb => cb.value);
+    if(ids.length === 0){ showToast('請至少勾選一家公司', 'error'); return; }
+    payload = { mode: 'companies', company_ids: ids };
+  } else {
+    // 全部：依目前範圍決定是整個all還是限定該國
+    payload = selectedCountry === '__ALL__' ? { mode: 'all' } : { mode: 'country', country: selectedCountry };
+  }
+
+  const btn = document.getElementById('reEvalStartBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '處理中...'; }
+  showJobStatus('正在重新評估既有公司，請稍後...（公司數量較多時可能需要幾分鐘）');
+  // 送出之後馬上關閉視窗，讓左下角狀態列直接清楚顯示，不會被視窗的半透明背景蓋得模糊，
+  // 也不用讓你乾等視窗開著、按鈕一直顯示「處理中」到請求結束才關掉。
+  closeReEvaluateModal();
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    let data = {};
+    try { data = await res.json(); } catch(e) { data = {}; }
+    hideJobStatus();
+    if(data && data.success){
+      const failedNote = data.failed_count ? `（另外 ${data.failed_count} 家更新失敗：${(data.failure_reasons||[])[0] || '未知原因'}）` : '';
+      const excerptNote = data.excerpt_save_note ? `（${data.excerpt_save_note}，可能是Notion還沒加「官網擷取摘要」欄位，不影響本次評分更新）` : '';
+      showToast('已重新評估 ' + (data.updated_count ?? 0) + ' 家公司，畫面即將自動更新' + failedNote + excerptNote, data.failed_count ? 'error' : 'success');
+      await loadData();
+    } else {
+      const reason = (data && data.failure_reasons && data.failure_reasons[0]) || ('HTTP ' + res.status);
+      showToast('重新評估失敗：' + reason, 'error');
+    }
+  }catch(err){
+    hideJobStatus();
+    showToast('請求送不出去：' + err.message, 'error');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '開始重新評估'; }
+  }
+}
+
+// ===== 審核機制:開關 + 選公司視窗 + 逐封審核佇列 =====
+let reviewModeOn = false;
+function onReviewToggle(){
+  const el = document.getElementById('reviewToggle');
+  reviewModeOn = !!(el && el.checked);
+  localStorage.setItem('reviewModeOn', reviewModeOn ? '1' : '0');
+}
+(function initReviewToggle(){
+  try{
+    const saved = localStorage.getItem('reviewModeOn') === '1';
+    reviewModeOn = saved;
+    document.addEventListener('DOMContentLoaded', function(){
+      const el = document.getElementById('reviewToggle'); if(el) el.checked = saved;
+    });
+  }catch(e){}
+})();
+
+let gradeReviewCandidates = [];
+function openGradeReviewModal(title, list){
+  gradeReviewCandidates = list;
+  document.getElementById('gradeReviewTitle').textContent = '選擇要審核的公司（' + title + '）';
+  const box = document.getElementById('gradeReviewList');
+  box.innerHTML = '';
+  list.forEach((c, i) => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; cursor:pointer; font-size:13px;';
+    const email = (typeof sendToEmailFor==='function' ? sendToEmailFor(c) : '') || '（無Email）';
+    row.innerHTML = '<input type="checkbox" class="grade-review-cb" data-idx="'+i+'" checked style="width:15px;height:15px;">' +
+      '<span style="flex:1;"><span style="font-weight:600; color:var(--text-heading);">'+escapeHtml(c.company_name||'')+'</span>' +
+      ' <span style="color:var(--text-faint); font-size:11px;">'+escapeHtml(c.grade||'')+' · '+ (c.total_score??0) +'分</span>' +
+      '<br><span style="color:var(--text-dim); font-size:11px;">'+escapeHtml(email)+'</span></span>';
+    box.appendChild(row);
+  });
+  document.getElementById('gradeReviewAll').checked = true;
+  document.getElementById('gradeReviewModal').classList.remove('hidden');
+}
+function closeGradeReviewModal(){ document.getElementById('gradeReviewModal').classList.add('hidden'); }
+function toggleAllGradeReview(){
+  const on = document.getElementById('gradeReviewAll').checked;
+  document.querySelectorAll('.grade-review-cb').forEach(cb => cb.checked = on);
+}
+
+// 審核佇列
+let reviewQueue = [];       // [{company_id, company_name}]
+let reviewQueueIdx = 0;
+let reviewEmailNumber = 1;
+
+function startGradeReview(){
+  const picked = [];
+  document.querySelectorAll('.grade-review-cb').forEach(cb => { if(cb.checked){ picked.push(gradeReviewCandidates[parseInt(cb.dataset.idx,10)]); } });
+  if(!picked.length){ showToast('請至少勾選一家公司', 'error'); return; }
+  // 問一次第幾封(整批共用)
+  let emailNumber = localStorage.getItem('lastEmailNumber') || '1';
+  emailNumber = prompt('這批要生成第幾封信？（1–7）\n1 認識 2 洞察 3 機會 4 差異化 5 證據 6 策略夥伴 7 未來願景', emailNumber);
+  if(!emailNumber) return;
+  reviewEmailNumber = Math.min(7, Math.max(1, parseInt(emailNumber,10) || 1));
+  localStorage.setItem('lastEmailNumber', String(reviewEmailNumber));
+  reviewQueue = picked.map(c => ({ company_id: c.id, company_name: c.company_name }));
+  reviewQueueIdx = 0;
+  closeGradeReviewModal();
+  processReviewQueue();
+}
+
+async function processReviewQueue(){
+  if(reviewQueueIdx >= reviewQueue.length){
+    if(reviewQueue.length) showToast('這批 ' + reviewQueue.length + ' 封已全部審核完成', 'success');
+    reviewQueue = []; reviewQueueIdx = 0;
+    return;
+  }
+  const item = reviewQueue[reviewQueueIdx];
+  const url = getSendEmailsUrl();
+  if(!url){ showToast('找不到寄信網址', 'error'); return; }
+  let selfEmail = localStorage.getItem('selfEmail') || '';
+  showToast('生成第 ' + (reviewQueueIdx+1) + '/' + reviewQueue.length + ' 封（' + item.company_name + '）...', null);
+  try{
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'single_send', company_id:item.company_id, self_email:selfEmail, email_number:reviewEmailNumber, preview:true }) });
+    let data = {};
+    try{ data = await res.json(); }catch(e){ data = {}; }
+    if(!data || (!data.subject && !data.body)){
+      showToast('第 ' + (reviewQueueIdx+1) + ' 封生成失敗，跳過（' + item.company_name + '）', 'error');
+      reviewQueueIdx++; processReviewQueue(); return;
+    }
+    openEmailPreviewModal(data);  // 沿用右側欄同一個審核視窗
+  }catch(err){
+    showToast('請求送不出去：' + err.message, 'error');
+  }
+}
+
+async function sendSingleAction(companyId, action, btnEl){
+  const url = getSendEmailsUrl();
+  if(!url){ showToast('找不到寄信網址，請確認已連接n8n Webhook', 'error'); return; }
+
+  // 寄信、草稿目前都先固定寄到你自己的信箱做確認，不會真的寄給對方公司
+  let selfEmail = localStorage.getItem('selfEmail');
+  if(!selfEmail){
+    selfEmail = prompt('第一次使用，請輸入你自己的信箱（會記住，之後不用再輸入；目前寄信/草稿都會先寄到這個信箱讓你確認）：');
+    if(!selfEmail) return;
+    localStorage.setItem('selfEmail', selfEmail);
+  }
+
+  let emailNumber = localStorage.getItem('lastEmailNumber') || '1';
+  emailNumber = prompt('要生成第幾封信？（1–7）\n1 認識 2 洞察 3 機會 4 差異化 5 證據 6 策略夥伴 7 未來願景', emailNumber);
+  if(!emailNumber) return;
+  emailNumber = Math.min(7, Math.max(1, parseInt(emailNumber,10) || 1));
+  localStorage.setItem('lastEmailNumber', String(emailNumber));
+  const mode = action === 'send' ? 'single_send' : 'single_draft';
+
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '生成中...'; }
+  try{
+    // 先只請AI生成信件內容，不會真的寄出——preview:true 這個旗標會讓n8n那邊在生成完之後
+    // 直接回傳內容給前端，不會走到真正寄送Email的那一步。
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, company_id: companyId, self_email: selfEmail, email_number: emailNumber, preview: true })
+    });
+    let data = {};
+    try { data = await res.json(); } catch(e) { data = {}; }
+    if(!data || (!data.subject && !data.body)){
+      showToast('生成信件內容失敗，請稍後再試（HTTP ' + res.status + '）', 'error');
+      return;
+    }
+    openEmailPreviewModal(data);
+  }catch(err){
+    showToast('請求送不出去（多半是瀏覽器CORS，請用 --disable-web-security 開啟）：' + err.message, 'error');
+  } finally {
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = action === 'send' ? '寄信' : '草稿'; }
+  }
+}
+
+let currentPreviewContext = null;
+
+function openEmailPreviewModal(data){
+  currentPreviewContext = data;
+  document.getElementById('previewTo').value = data.to || '(尚未設定自己的信箱)';
+  document.getElementById('previewSubject').value = data.subject || '';
+  document.getElementById('previewBody').value = data.body || '';
+  // 佇列(批次審核)模式:顯示跳過鈕 + 進度
+  const inQueue = reviewQueue && reviewQueue.length > 0;
+  const skipBtn = document.getElementById('previewSkipBtn');
+  if(skipBtn) skipBtn.style.display = inQueue ? '' : 'none';
+  const h = document.querySelector('#emailPreviewModal .modal-header h3');
+  if(h) h.textContent = inQueue ? ('審核信件（' + (reviewQueueIdx+1) + '/' + reviewQueue.length + '）') : '寄出前先確認信件內容';
+  document.getElementById('emailPreviewModal').classList.remove('hidden');
+}
+
+function skipReviewItem(){
+  document.getElementById('emailPreviewModal').classList.add('hidden');
+  currentPreviewContext = null;
+  if(reviewQueue && reviewQueue.length){ reviewQueueIdx++; processReviewQueue(); }
+}
+function closeEmailPreviewModal(){
+  document.getElementById('emailPreviewModal').classList.add('hidden');
+  currentPreviewContext = null;
+  if(reviewQueue && reviewQueue.length){ reviewQueue = []; reviewQueueIdx = 0; showToast('已中止批次審核', null); }
+}
+
+async function confirmSendPreview(){
+  if(!currentPreviewContext) return;
+  const url = getConfirmSendUrl();
+  if(!url){ showToast('找不到確認寄送的網址，請確認已連接n8n Webhook', 'error'); return; }
+  const btn = document.getElementById('previewConfirmBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '寄送中...'; }
+  const payload = {
+    company_id: currentPreviewContext.company_id,
+    company_name: currentPreviewContext.company_name,
+    run_id: currentPreviewContext.run_id,
+    email_number: currentPreviewContext.email_number,
+    is_draft: currentPreviewContext.is_draft,
+    to: currentPreviewContext.to,
+    subject: document.getElementById('previewSubject').value,
+    body: document.getElementById('previewBody').value
+  };
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    let data = {};
+    try { data = await res.json(); } catch(e) { data = {}; }
+    if(data.sent_count > 0){
+      showToast(currentPreviewContext.is_draft ? '草稿已寄到 ' + currentPreviewContext.to : '信已寄出', 'success');
+      if(reviewQueue && reviewQueue.length){
+        document.getElementById('emailPreviewModal').classList.add('hidden');
+        currentPreviewContext = null;
+        reviewQueueIdx++;
+        processReviewQueue();
+      } else {
+        closeEmailPreviewModal();
+      }
+    } else {
+      // 後端現在會自動判斷失敗原因(例如寄送Email節點被停用、憑證沒設定)，直接顯示給你看，不用自己去n8n翻執行紀錄
+      const reason = (data.failure_reasons && data.failure_reasons[0]) || ('寄送失敗，HTTP ' + res.status + '，請檢查n8n「寄送Email」節點是否啟用、SMTP憑證是否設定正確');
+      showToast('寄送失敗：' + reason, 'error');
+    }
+  }catch(err){
+    showToast('請求送不出去：' + err.message, 'error');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '確認寄出'; }
+  }
+}
+
+function formatGdpPerCapita(usd, year){
+  if(usd == null) return '無資料';
+  const yearSuffix = year ? ('（' + year + '年）') : '';
+  return 'US$' + Math.round(usd).toLocaleString('en-US') + yearSuffix;
+}
+function scoreColor(score){
+  if(score >= 90) return 'var(--grade-s)';
+  if(score >= 75) return 'var(--grade-a)';
+  if(score >= 50) return 'var(--grade-b)';
+  if(score >= 25) return 'var(--grade-c)';
+  return 'var(--grade-d)';
+}
+function gradeColorBg(g){
+  return { S:'var(--grade-s-dim)', A:'var(--grade-a-dim)', B:'var(--grade-b-dim)', C:'var(--grade-c-dim)', D:'var(--grade-d-dim)' }[g] || 'var(--panel-2)';
+}
+function gradeColorFg(g){
+  return { S:'var(--grade-s)', A:'var(--grade-a)', B:'var(--grade-b)', C:'var(--grade-c)', D:'var(--grade-d)' }[g] || 'var(--text-dim)';
+}
+function sourceColor(source){
+  if(source && source.indexOf('Tavily') !== -1) return { bg:'var(--grade-b-dim)', fg:'var(--grade-b)' };
+  if(source && source.indexOf('Discover') !== -1) return { bg:'var(--grade-c-dim)', fg:'var(--grade-c)' };
+  return { bg:'var(--grade-a-dim)', fg:'var(--grade-a)' };
+}
+
+function diagnoseFetchError(err){
+  let msg = '無法連線到 n8n Webhook：' + err.message + '。';
+  if(err.message.indexOf('Failed to fetch') !== -1){
+    msg += ' 常見原因：① n8n流程還沒啟用(Active) ② 網址貼的是Test URL不是Production URL ③ 伺服器連線問題。建議先用「在新分頁直接開啟網址測試」確認。';
+  }
+  return msg;
+}
+
+function buildUrl(baseUrl, runId){
+  try{
+    const u = new URL(baseUrl);
+    if(runId) u.searchParams.set('run_id', runId);
+    return u.toString();
+  }catch(e){
+    return baseUrl + (runId ? (baseUrl.indexOf('?') === -1 ? '?' : '&') + 'run_id=' + encodeURIComponent(runId) : '');
+  }
+}
+
+async function loadData(selectedRunId){
+  const url = getWebhookUrl();
+  if(!url) return;
+  const errorBanner = document.getElementById('errorBanner');
+  try{
+    const fetchUrl = buildUrl(url, selectedRunId);
+    const res = await fetch(fetchUrl, { cache: 'no-store' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    errorBanner.classList.add('hidden');
+    render(data);
+    // 不管這次刷新是手動按的、自動輪詢的、還是①②送出後排程的檢查，
+    // 只要拿到新資料就順便看一下有沒有正在等待的任務完成了。
+    checkActiveJobCompletion(data);
+  }catch(err){
+    errorBanner.textContent = diagnoseFetchError(err);
+    errorBanner.classList.remove('hidden');
+  }
+}
+
+function onRunChange(){
+  const sel = document.getElementById('runSelect');
+  loadData(sel.value);
+}
+
+function populateRunSelect(runs, selectedRunId){
+  currentRuns = runs || [];
+  const sel = document.getElementById('runSelect');
+  sel.innerHTML = '';
+  if(currentRuns.length === 0){
+    const opt = document.createElement('option');
+    opt.textContent = '尚無搜尋紀錄';
+    sel.appendChild(opt);
+    return;
+  }
+  currentRuns.forEach((r, idx) => {
+    const opt = document.createElement('option');
+    opt.value = r.run_id;
+    const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    opt.textContent = (idx === 0 ? '最近一次 · ' : '') + r.label + '（' + timeStr + '）';
+    if(r.run_id === selectedRunId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function scrollTop(){
+  // 涵蓋所有可能的捲動容器,instant 立即歸零,確保一定回到頂端
+  var targets = [window, document.scrollingElement, document.documentElement, document.body,
+                 document.querySelector('.main-content'), document.querySelector('.sidebar')];
+  targets.forEach(function(el){
+    if(!el) return;
+    try { el.scrollTop = 0; } catch(e){}
+    try { el.scrollTo(0, 0); } catch(e){}
+  });
+  var top = document.getElementById('page-top');
+  if(top && top.scrollIntoView) { try { top.scrollIntoView(); } catch(e){} }
+}
+function scrollToEl(id){ const el = document.getElementById(id); if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+// 目前所在國家指示
+let countryCards = [];
+let countryBriefPage = 0;
+let currentCountryListData = [];
+let expandedCountries = new Set();
+
+// 直接反映「選擇國家」目前選的是哪一國，全球總覽時顯示「全球總覽」，
+// 不再靠捲動位置去猜你現在看到哪張卡片（比較單純、也比較準確）。
+function updateCurrentCountry(){
+  const box = document.getElementById('currentCountryBox');
+  if(!box) return;
+  box.classList.remove('hidden');
+  const name = selectedCountry === '__ALL__' ? '全球總覽' : countryDisplayName(selectedCountry);
+  document.getElementById('currentCountryName').textContent = name;
+}
+
+let currentData = null;
+let selectedCountry = '__ALL__';
+
+// 國家名稱正規化：去除頭尾空白、統一小寫，避免因為資料裡多打空白、大小寫不同
+// （例如 "Germany " 或 "germany"）就被判定成不同國家，導致篩選漏掉資料。
+function normCountry(s){
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function countryEquals(a, b){
+  return normCountry(a) === normCountry(b);
+}
+
+let countrySelectNames = [];
+
+function populateCountrySelect(data){
+  const rawNames = [
+    ...((data.countryList||[]).map(c => c.country)),
+    ...((data.allCandidates||[]).map(c => c.country))
+  ].filter(Boolean);
+  // 依正規化後的 key 去重，但保留第一次出現時的原始寫法作為顯示文字/值，
+  // 這樣「Germany」跟「germany 」只會出現一個選項，且維持原本的正確拼法。
+  // 這裡只會收「data.countryList / data.allCandidates」裡實際出現過的國家，
+  // 也就是「已經有做過分析」的國家，不是列出全世界所有國家。
+  const seen = new Map();
+  rawNames.forEach(n => {
+    const key = normCountry(n);
+    if(key && !seen.has(key)) seen.set(key, n);
+  });
+
+  // 每個國家「最近一次有動作」的時間戳記：國家背景(countryList)、抓公司(allCandidates)
+  // 兩邊都要看，取兩者中比較新的那個，這樣不管是跑①還是②，這個國家都會被排到上面。
+  const latestByKey = new Map();
+  const bump = (country, ts) => {
+    if(!ts) return;
+    const key = normCountry(country);
+    if(!key) return;
+    const t = new Date(ts).getTime();
+    if(!Number.isFinite(t)) return;
+    const cur = latestByKey.get(key) || 0;
+    if(t > cur) latestByKey.set(key, t);
+  };
+  (data.countryList||[]).forEach(c => bump(c.country, c.timestamp));
+  (data.allCandidates||[]).forEach(c => bump(c.country, c.timestamp));
+
+  countrySelectNames = [...seen.values()].sort((a, b) => {
+    const ta = latestByKey.get(normCountry(a)) || 0;
+    const tb = latestByKey.get(normCountry(b)) || 0;
+    if(tb !== ta) return tb - ta; // 最近有動作的排前面
+    return String(a).localeCompare(String(b)); // 時間一樣或都沒有的，退回照字母排序
+  });
+
+  const stillExists = selectedCountry === '__ALL__' || countrySelectNames.some(n => countryEquals(n, selectedCountry));
+  if(!stillExists) selectedCountry = '__ALL__';
+
+  updateCountrySelectInputDisplay();
+}
+
+// 讓輸入框的文字，隨時反映「目前實際選的國家」，跟使用者正在打字搜尋的暫時狀態分開
+function updateCountrySelectInputDisplay(){
+  const input = document.getElementById('countrySelectInput');
+  if(!input) return;
+  if(selectedCountry === '__ALL__'){
+    input.value = '全球總覽';
+    input.style.color = '';
+  } else {
+    const match = countrySelectNames.find(n => countryEquals(n, selectedCountry));
+    const displayName = match || selectedCountry;
+    const mode = getCountryMode(displayName);
+    // 文字輸入框沒辦法放彩色小圓點元素，用「● 」這個符號當替代，
+    // 整段文字（含符號）套用該國目前運作模式的顏色，達到類似的視覺效果。
+    input.value = '● ' + countryDisplayName(displayName);
+    input.style.color = COUNTRY_MODE_META[mode].color;
+  }
+  loadCountryModeSelect();
+}
+
+function closeCountrySelectDropdown(){
+  const dd = document.getElementById('countrySelectDropdown');
+  if(!dd) return;
+  dd.classList.add('hidden');
+  dd.innerHTML = '';
+}
+
+function toggleCountrySelectDropdown(e){
+  if(e) e.stopPropagation();
+  const dd = document.getElementById('countrySelectDropdown');
+  if(dd && !dd.classList.contains('hidden')){
+    closeCountrySelectDropdown();
+    updateCountrySelectInputDisplay();
+  } else {
+    document.getElementById('countrySelectInput').focus();
+  }
+}
+
+function onCountrySelectInput(forceShowAll){
+  const raw = forceShowAll ? '' : document.getElementById('countrySelectInput').value.trim().toLowerCase();
+  const dd = document.getElementById('countrySelectDropdown');
+  const allOptions = ['全球總覽', ...countrySelectNames];
+  const matches = raw
+    ? allOptions.filter(n => n.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[n]||'').includes(raw))
+    : allOptions;
+  dd.innerHTML = '';
+  if(matches.length === 0){
+    dd.innerHTML = '<div class="country-dropdown-empty">找不到符合的國家</div>';
+  } else {
+    matches.slice(0, 30).forEach(name => {
+      const opt = document.createElement('div');
+      opt.className = 'country-option' + (name === '全球總覽' ? ' country-option-sticky' : '');
+      if(name === '全球總覽'){
+        opt.textContent = name;
+      } else {
+        const mode = getCountryMode(name);
+        const color = COUNTRY_MODE_META[mode].color;
+        opt.innerHTML = `<span class="mode-dot" style="background:${color};"></span><span style="color:${color};">${escapeHtml(countryDisplayName(name))}</span>`;
+      }
+      opt.onclick = () => selectCountryFromDropdown(name);
+      dd.appendChild(opt);
+    });
+  }
+  dd.classList.remove('hidden');
+}
+
+function onCountrySelectKeydown(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    const raw = document.getElementById('countrySelectInput').value.trim().toLowerCase();
+    const allOptions = ['全球總覽', ...countrySelectNames];
+    const exact = allOptions.find(n => n.toLowerCase() === raw || COUNTRY_ZH_NAMES[n] === raw);
+    const firstMatch = exact || allOptions.find(n => n.toLowerCase().includes(raw) || (COUNTRY_ZH_NAMES[n]||'').includes(raw));
+    if(firstMatch) selectCountryFromDropdown(firstMatch);
+  } else if(e.key === 'Escape'){
+    closeCountrySelectDropdown();
+    updateCountrySelectInputDisplay();
+  }
+}
+
+// 「該國運作狀態」目前只存在瀏覽器本機(localStorage)、依國家分別記住你選的模式，
+// 還沒有接到n8n的自動化排程——之後真的要做定時自動化時，這裡選的模式會是後端判斷依據。
+function getCountryModeStorageKey(country){
+  return 'countryMode:' + normCountry(country);
+}
+
+function loadCountryModeSelect(){
+  const sel = document.getElementById('countryModeSelect');
+  if(!sel) return;
+  if(selectedCountry === '__ALL__'){
+    sel.disabled = true;
+    sel.value = 'manual';
+    sel.style.color = '';
+    sel.title = '選單一個國家才能設定該國的運作模式';
+    return;
+  }
+  sel.disabled = false;
+  sel.title = '';
+  const mode = getCountryMode(selectedCountry);
+  sel.value = mode;
+  sel.style.color = COUNTRY_MODE_META[mode].color;
+}
+
+function onCountryModeChange(){
+  if(selectedCountry === '__ALL__') return;
+  const sel = document.getElementById('countryModeSelect');
+  localStorage.setItem(getCountryModeStorageKey(selectedCountry), sel.value);
+  sel.style.color = COUNTRY_MODE_META[sel.value].color;
+  const label = COUNTRY_MODE_META[sel.value].label;
+  showToast('「' + countryDisplayName(selectedCountry) + '」已設定為「' + label + '」（目前僅記錄在瀏覽器本機，尚未接自動化後端）', null);
+  // 這個國家在「選擇國家」輸入框上顯示的顏色也要跟著換新
+  updateCountrySelectInputDisplay();
+}
+
+function selectCountryFromDropdown(name){
+  selectedCountry = (name === '全球總覽') ? '__ALL__' : name;
+  closeCountrySelectDropdown();
+  updateCountrySelectInputDisplay();
+  loadCountryModeSelect();
+  gradePage = 0; contactPage = 0; worklogPage = 0; countryBriefPage = 0;
+  if(currentData) render(currentData);
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('countrySelectWrap');
+  if(wrap && !wrap.contains(e.target)){
+    closeCountrySelectDropdown();
+    updateCountrySelectInputDisplay(); // 點外面就還原顯示目前實際選的國家，取消還沒選定的打字內容
+  }
+});
+
+function computeKpis(cands){
+  const total = cands.length;
+  const avg = total ? Math.round(cands.reduce((s,c)=>s+(c.total_score||0),0)/total) : 0;
+  const p1 = cands.filter(c=>c.priority==='P1').length;
+  return { totalCandidates: total, avgScore: avg, p1Count: p1 };
+}
+function computeGrades(cands){
+  const g={S:0,A:0,B:0,C:0,D:0};
+  cands.forEach(c=>{ if(g[c.grade]!==undefined) g[c.grade]++; });
+  return ['S','A','B','C','D'].map(k=>({label:k, value:g[k]}));
+}
+// 分類分布：依候選公司的「分類」欄位分組計算佔比。選單選單一國家時只算該國，
+// 選「全部國家」時allCandidates本來就是未篩選的全部資料，會自動變成全部國家加總。
+function computeCategoryDistribution(cands){
+  const counts = {};
+  cands.forEach(c => {
+    const key = String(c.category || '').trim() || '未分類';
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const total = cands.length;
+  return Object.entries(counts)
+    .map(([label, value]) => ({ label, value, pct: total ? Math.round((value/total)*1000)/10 : 0 }))
+    .sort((a,b) => b.value - a.value);
+}
+
+function render(data){
+  currentData = data;
+  // 防護：Notion裡偶爾會混入公司名稱是空白的髒資料（例如手動建立的空白頁面、
+  // 或AI流程寫入失敗但仍建立了紀錄），這種資料沒有任何辨識價值，
+  // 直接在這裡濾掉，避免它們污染KPI數字、國家篩選、公司清單等所有畫面。
+  const cleanAllCandidates = (data.allCandidates || []).filter(c => c && String(c.company_name || '').trim() !== '');
+  const droppedCount = (data.allCandidates || []).length - cleanAllCandidates.length;
+  if(droppedCount > 0){
+    console.warn(`[儀表板] 過濾掉 ${droppedCount} 筆公司名稱為空的異常資料，建議去 Notion 檢查候選公司評估總表。`);
+  }
+  data = { ...data, allCandidates: cleanAllCandidates };
+
+  populateCountrySelect(data);
+  const f = selectedCountry !== '__ALL__';
+  const countryList = f ? (data.countryList||[]).filter(c => countryEquals(c.country, selectedCountry)) : (data.countryList||[]);
+  const allCandidates = f ? (data.allCandidates||[]).filter(c => countryEquals(c.country, selectedCountry)) : (data.allCandidates||[]);
+  const companyMap = f ? (data.companyMap||[]).filter(c => countryEquals(c.country, selectedCountry)) : (data.companyMap||[]);
+  const worklog = f ? (data.worklog||[]).filter(w => normCountry(w.target).indexOf(normCountry(selectedCountry)) !== -1) : (data.worklog||[]);
+
+  currentAllCandidates = allCandidates;
+  currentEmailLog = data.emailLog || [];
+  const activeBtn = document.querySelector('.btn-grade-filter.active');
+  if(activeBtn){
+    const label = activeBtn.textContent.trim();
+    if(label === '公司總覽'){
+      applyFilter('all', 'ALL', activeBtn);
+    } else if(label === 'P1最優先'){
+      applyFilter('priority', 'P1', activeBtn);
+    } else {
+      applyFilter('grade', label.replace('級',''), activeBtn);
+    }
+  } else {
+    const allBtn = document.querySelector('#gradeFilterRow .btn-grade-filter');
+    if(allBtn) applyFilter('all', 'ALL', allBtn);
+  }
+  renderContactFilterButtons();
+  renderContactCenter();
+
+  const kpis = computeKpis(allCandidates);
+  fitKpiValue('kpiAvgScore', String(kpis.avgScore ?? 0));
+  fitKpiValue('kpiP1', String(kpis.p1Count ?? 0));
+  document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('zh-TW');
+
+  // 聯絡進度漏斗：已聯絡（真的有寄出信給對方的狀態，草稿寄給自己/寄送失敗都不算）
+  // → 已收到回覆，兩層都各自算一次佔比，方便一眼看出從候選公司到實際互動的轉換率。
+  const totalCandidates = kpis.totalCandidates ?? 0;
+  const CONTACTED_STATUSES = ['已寄信', '已回覆待確認', '待跟進'];
+  const contactedCount = allCandidates.filter(c => CONTACTED_STATUSES.includes(c.contact_status)).length;
+  const repliedCount = allCandidates.filter(c => c.contact_status === '已回覆待確認').length;
+  const contactedPct = totalCandidates ? Math.round((contactedCount / totalCandidates) * 100) : 0;
+  const repliedPct = contactedCount ? Math.round((repliedCount / contactedCount) * 100) : 0;
+  fitKpiValue('kpiContactedPct', contactedPct + '%');
+  document.getElementById('kpiContacted').textContent = contactedCount + '／' + totalCandidates;
+  fitKpiValue('kpiRepliedPct', repliedPct + '%');
+  document.getElementById('kpiReplied').textContent = repliedCount + '／' + contactedCount;
+
+  // 「累計評估國家數」是跨國家的整體統計，只有在「全部國家」視圖下才有意義；
+  // 選到單一國家時這張卡片永遠只會顯示1，沒有參考價值，直接隱藏。
+  // 這裡固定用完整、未經篩選的國家市場評分清單去算，確保只要跑過①國家背景
+  // （不需要跑到②抓公司）的國家都會被算進去，不會漏掉像UK這種還沒抓公司的國家。
+  const kpiCountriesCard = document.getElementById('kpiCardCountries');
+  const kpiRow = document.getElementById('kpiRow');
+  if(f){
+    kpiCountriesCard.classList.add('hidden');
+    kpiRow.classList.add('kpi-row-4');
+  } else {
+    kpiCountriesCard.classList.remove('hidden');
+    kpiRow.classList.remove('kpi-row-4');
+    const allCountriesEvaluated = new Set((data.countryList||[]).map(c=>normCountry(c.country)).filter(Boolean)).size;
+    fitKpiValue('kpiCountries', String(allCountriesEvaluated));
+  }
+
+  renderGrades(computeGrades(allCandidates));
+
+  // 「全部國家」視圖時，國家投資簡介照最新更新時間排序（最近做過國家背景的排最前面）；
+  // 單一國家視圖反正只有一筆，排序與否沒差。
+  currentCountryListData = [...countryList].sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tb - ta;
+  });
+  renderCountryBrief();
+
+  currentWorklog = worklog;
+  renderWorklog();
+
+  renderGradeChart(computeGrades(allCandidates));
+  renderCategoryChart(computeCategoryDistribution(allCandidates));
+  renderMap(companyMap, countryList);
+  // 國家色塊要反映「全系統」做過投資簡介的國家，不受目前選的單一國家篩選影響，
+  // 所以這裡固定用未篩選過的完整國家市場評分清單(data.countryList)，不是country篩選後的countryList。
+  applyCountryHighlights((data.countryList||[]).map(c => c.country).filter(Boolean));
+}
+
+function renderGrades(items){
+  const row = document.getElementById('gradeRow');
+  row.innerHTML = '';
+  items.forEach(i => {
+    const pill = document.createElement('div');
+    pill.className = 'grade-pill';
+    pill.style.background = gradeColorBg(i.label);
+    pill.innerHTML = `<div class="g" style="color:${gradeColorFg(i.label)};">${i.label}</div><div class="n">${i.value} 家</div>`;
+    row.appendChild(pill);
+  });
+}
+
+function renderGradeChart(items){
+  const labels = items.map(i => i.label);
+  const values = items.map(i => i.value);
+  const rawColors = { S:'#7A5CC0', A:'#84BD00', B:'#3B7FC4', C:'#C99A1E', D:'#C24A3F' };
+  const colors = labels.map(l => rawColors[l] || '#A7AAAC');
+
+  if(gradeChartInstance){ gradeChartInstance.destroy(); }
+  const ctx = document.getElementById('gradeChart');
+  gradeChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, barThickness: 32 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, color: '#A7AAAC' }, grid: { color: '#E7E9E4' } },
+        x: { ticks: { color: '#A7AAAC' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderCategoryChart(items){
+  const legendEl = document.getElementById('categoryLegend');
+  const emptyEl = document.getElementById('categoryChartEmpty');
+  const canvasEl = document.getElementById('categoryChart');
+  legendEl.innerHTML = '';
+
+  if(!items.length){
+    if(categoryChartInstance){ categoryChartInstance.destroy(); categoryChartInstance = null; }
+    canvasEl.style.display = 'none';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  canvasEl.style.display = '';
+  emptyEl.classList.add('hidden');
+
+  const labels = items.map(i => i.label);
+  const values = items.map(i => i.value);
+  const colors = items.map((_, idx) => CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length]);
+
+  if(categoryChartInstance){ categoryChartInstance.destroy(); }
+  categoryChartInstance = new Chart(canvasEl, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#FFFFFF' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => {
+          const item = items[ctx.dataIndex];
+          return ` ${item.label}：${item.value} 家（${item.pct}%）`;
+        } } }
+      }
+    }
+  });
+
+  items.forEach((i, idx) => {
+    const row = document.createElement('div');
+    row.className = 'category-legend-row';
+    row.innerHTML = `<span class="legend-dot" style="background:${colors[idx]};"></span><span class="legend-label">${escapeHtml(i.label)}</span><span class="legend-pct">${i.pct}%（${i.value}家）</span>`;
+    legendEl.appendChild(row);
+  });
+}
+
+async function geocode(query){
+  if(!query) return null;
+  if(geocodeCache[query]) return geocodeCache[query];
+  try{
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+      headers: { 'Accept-Language': 'zh-TW,en' }
+    });
+    const arr = await res.json();
+    if(arr && arr[0]){
+      const coord = { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon) };
+      geocodeCache[query] = coord;
+      localStorage.setItem('geocodeCache', JSON.stringify(geocodeCache));
+      return coord;
+    }
+  }catch(e){ /* 忽略單筆geocode失敗 */ }
+  return null;
+}
+
+function jitter(coord){
+  return { lat: coord.lat + (Math.random()-0.5)*0.15, lon: coord.lon + (Math.random()-0.5)*0.15 };
+}
+
+// 世界各國邊界圖資，只下載一次、快取起來(檔案約250KB，不用每次畫地圖都重抓)。
+// 抓失敗(離線/CDN被擋)就靜靜放棄，不影響原本公司綠點的地圖功能。
+function loadWorldGeoJson(){
+  if(!worldGeoJsonPromise){
+    worldGeoJsonPromise = fetch('https://cdn.jsdelivr.net/gh/johan/world.geo.json@master/countries.geo.json')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+  }
+  return worldGeoJsonPromise;
+}
+
+// 這份公開圖資的英文國名，有幾個跟我們自己系統用的名稱對不起來，這裡列出已知的對照。
+const GEOJSON_NAME_ALIASES = {
+  'united states': ['united states of america'],
+  'south korea': ['korea, republic of', 'republic of korea'],
+  'czech republic': ['czechia'],
+  'united kingdom': ['united kingdom of great britain and northern ireland']
+};
+
+function countryNameMatches(geoName, ourName){
+  const a = normCountry(geoName);
+  const b = normCountry(ourName);
+  if(!a || !b) return false;
+  if(a === b) return true;
+  if((GEOJSON_NAME_ALIASES[b] || []).includes(a)) return true;
+  // 最後保底：任一方包含另一方，處理少數命名上細微差異的狀況
+  if(a.length > 3 && b.length > 3 && (a.includes(b) || b.includes(a))) return true;
+  return false;
+}
+
+// 第一次需要時才載入國界圖層，加到地圖上但先全部設成透明(不影響原本的底圖樣子)，
+// 等圖資載入完成，再套用當下最新一批「已做過國家投資簡介」的國家清單去上色。
+async function ensureCountryHighlightLayer(){
+  if(countryHighlightLayer || !leafletMap) return;
+  const geojson = await loadWorldGeoJson();
+  if(!geojson || !leafletMap) return;
+  countryHighlightLayer = L.geoJSON(geojson, {
+    style: () => ({ fillOpacity: 0, weight: 0, color: 'transparent' }),
+    interactive: false
+  }).addTo(leafletMap);
+  countryHighlightLayer.bringToBack();
+  applyCountryHighlights(latestEvaluatedCountries);
+}
+
+// 幫「已做過國家投資簡介」的國家上色，跟其他國家做出視覺區隔。
+function applyCountryHighlights(evaluatedNames){
+  latestEvaluatedCountries = evaluatedNames || [];
+  if(!countryHighlightLayer) return;
+  countryHighlightLayer.eachLayer(layer => {
+    const geoName = layer.feature && layer.feature.properties && layer.feature.properties.name;
+    const isEvaluated = latestEvaluatedCountries.some(n => countryNameMatches(geoName, n));
+    layer.setStyle(isEvaluated
+      ? { fillColor: '#84BD00', fillOpacity: 0.32, color: '#5c8a00', weight: 1.2 }
+      : { fillOpacity: 0, weight: 0, color: 'transparent' }
+    );
+  });
+}
+
+async function renderMap(companies, countryList){
+  // 每次呼叫都拿一個新的「本次執行序號」。因為地理編碼是非同步、有延遲的，
+  // 如果使用者在查詢還沒跑完時就切換國家，舊的那次查詢跑完後不該再把結果畫到地圖上，
+  // 否則就會出現「明明選了UK，地圖卻還留著上一次Germany公司」這種蓋圖問題。
+  const myToken = ++mapRenderToken;
+
+  if(!leafletMap){
+    leafletMap = L.map('map', { zoomControl: true, attributionControl: true }).setView([20, 0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 18
+    }).addTo(leafletMap);
+    mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+    ensureCountryHighlightLayer();
+  }
+
+  if(companies.length === 0){
+    if(myToken !== mapRenderToken) return; // 中途又被更新的請求取代了，不要再動地圖
+    mapMarkersLayer.clearLayers();
+    leafletMap.setView([20, 0], 2);
+    return;
+  }
+
+  const countryCoordCache = {};
+  const uniqueCountries = [...new Set(companies.map(c => c.country).filter(Boolean))];
+  for(const country of uniqueCountries){
+    if(myToken !== mapRenderToken) return; // 已經有更新的請求了，這次舊的直接放棄
+    const coord = await geocode(country);
+    if(coord) countryCoordCache[country] = coord;
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  const bounds = [];
+  const pendingMarkers = [];
+  for(const c of companies){
+    if(myToken !== mapRenderToken) return; // 同上，隨時檢查是否已過時
+    let coord = null;
+    const query = [c.location, c.country].filter(Boolean).join(', ');
+    if(query){
+      coord = await geocode(query);
+      await new Promise(r => setTimeout(r, 350));
+    }
+    if(!coord && c.country && countryCoordCache[c.country]){
+      coord = jitter(countryCoordCache[c.country]);
+    }
+    if(!coord) continue;
+    bounds.push([coord.lat, coord.lon]);
+    pendingMarkers.push({ coord, company: c });
+  }
+
+  // 全部查完之後，最後再次確認自己還是最新的一次，才真正清空並畫上地圖，
+  // 避免「查完的當下才被更新的請求蓋過去」這種最後一刻的競爭狀況。
+  if(myToken !== mapRenderToken) return;
+  mapMarkersLayer.clearLayers();
+  pendingMarkers.forEach(({coord, company: c}) => {
+    const marker = L.circleMarker([coord.lat, coord.lon], {
+      radius: 7, color: '#84BD00', fillColor: '#84BD00', fillOpacity: 0.7, weight: 2
+    }).addTo(mapMarkersLayer);
+    marker.bindPopup(`<b>${escapeHtml(c.company_name||'')}</b><br>${escapeHtml(c.location||'')}<br>等級：${escapeHtml(c.grade||'-')}`);
+  });
+
+  if(bounds.length > 0){
+    leafletMap.fitBounds(bounds, { padding: [30,30], maxZoom: 8 });
+  }
+}
+
+function contactStatusBadge(status){
+  if(!status || status === '未聯繫') return '';
+  const colors = {
+    '已寄信': { bg:'var(--grade-b-dim)', fg:'var(--grade-b)' },
+    '已寄草稿': { bg:'#FAF1DC', fg:'var(--grade-c)' },
+    '已回覆待確認': { bg:'var(--grade-a-dim)', fg:'var(--grade-a)' },
+    '待跟進': { bg:'#FAF1DC', fg:'var(--grade-c)' },
+    '寄送失敗': { bg:'var(--grade-d-dim)', fg:'var(--grade-d)' }
+  };
+  const c = colors[status] || { bg:'var(--panel-2)', fg:'var(--text-dim)' };
+  return `<span style="display:inline-block; margin-top:3px; font-size:10px; padding:1px 6px; border-radius:4px; background:${c.bg}; color:${c.fg};">${escapeHtml(status)}</span>`;
+}
+
+// 建議行動存的格式是「類型｜細節」(用全形｜分隔)，這裡切開給前端分別使用：
+// 類型當標題直接顯示，細節收在滑鼠移上去才看得到的提示泡泡裡，避免表格塞太多字。
+// 類型本身還帶著英文全稱，例如「零售通路合作（Retail Partnership）」，畫面上只留中文部分，
+// 英文括號那段拿掉(存進Notion的原始資料不受影響，這裡只是顯示層面的處理)。
+function recommendedActionParts(raw){
+  const s = String(raw || '');
+  const idx = s.indexOf('｜');
+  const type = idx === -1 ? s : s.slice(0, idx);
+  const detail = idx === -1 ? '' : s.slice(idx + 1);
+  const typeZhOnly = type.replace(/[（(][^）)]*[）)]\s*$/, '').trim();
+  return { type: typeZhOnly || type, detail };
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+(function init(){
+  const saved = getWebhookUrl();
+  if(saved){
+    document.getElementById('webhookInput').value = saved;
+    showDashboard();
+  }
+  setInterval(() => {
+    if(getWebhookUrl()){
+      const sel = document.getElementById('runSelect');
+      loadData(sel ? sel.value : undefined);
+    }
+  }, 90000);
+})();
+
+// 側邊欄提示框修正:.sidebar 有 overflow-y:auto 讓側邊欄可以獨立捲動,
+// 但這會連帶把原本用 CSS ::after 做的提示框裁切掉(超出可視範圍的部分直接被切掉、看不到)。
+// 這裡改用 JS 動態產生一個 position:fixed 的浮動框,直接貼在 <body> 底下、不受任何父層 overflow 影響,
+// 並且自己判斷會不會超出畫面邊緣,超出下緣就改顯示在按鈕上方、超出右緣就往左靠。
+(function initSidebarTooltips(){
+  const tip = document.createElement('div');
+  tip.id = 'sidebarFloatTip';
+  tip.style.cssText = 'position:fixed; z-index:9000; max-width:260px; white-space:normal; word-break:break-word; background:var(--panel); color:var(--text-dim); border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px; font-size:12px; line-height:1.6; box-shadow:var(--shadow-lg); text-align:left; font-weight:400; display:none; pointer-events:none;';
+  document.body.appendChild(tip);
+
+  function showTip(el){
+    const text = el.getAttribute('data-tip');
+    if(!text) return;
+    tip.textContent = text;
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    tip.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = r.left;
+    let top = r.bottom + 6;
+    const maxLeft = window.innerWidth - tw - 8;
+    if(left > maxLeft) left = Math.max(8, maxLeft);
+    if(top + th > window.innerHeight - 8){
+      top = r.top - th - 6; // 下面放不下就改顯示在上面
+    }
+    if(top < 8) top = 8;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function hideTip(){ tip.style.display = 'none'; }
+
+  document.querySelectorAll('.sidebar [data-tip]').forEach(function(el){
+    el.addEventListener('mouseenter', function(){ showTip(el); });
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('blur', hideTip);
+  });
+})();
+
+// 浮動回頂端按鈕:捲動超過 300px 就出現
+(function(){
+  function toggleFab(){
+    var fab=document.getElementById('fabTop'); if(!fab) return;
+    var mc=document.querySelector('.main-content');
+    var y=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;
+    var my=mc?mc.scrollTop:0;
+    var se=(document.scrollingElement&&document.scrollingElement.scrollTop)||0; if(y>150||my>150||se>150) fab.classList.add('show'); else fab.classList.remove('show');
+  }
+  window.addEventListener('scroll', toggleFab, {passive:true});
+  var mc=document.querySelector('.main-content'); if(mc) mc.addEventListener('scroll', toggleFab, {passive:true});
+  document.addEventListener('DOMContentLoaded', toggleFab);
+  setTimeout(toggleFab, 500);
+})();
+</script>
+
+  <a id="fabTop" class="fab-top" href="#page-top" title="回到最上面">↑</a>
+</body>
+</html>
